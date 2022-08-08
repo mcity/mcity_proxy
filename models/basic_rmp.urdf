@@ -1,0 +1,49 @@
+<?xml version="1.0" ?>
+<robot name="rmp_401" xmlns:xacro="http://ros.org/wiki/xacro">
+  <!-- ****************** ROBOT CONSTANTS *******************************  -->
+  <!-- Define the size of the robot's main chassis in meters -->
+  <xacro:property name="base_width" value="0.39"/>
+  <xacro:property name="base_length" value="0.70"/>
+  <xacro:property name="base_height" value="0.20"/>
+  <!-- Define intertial property macros  -->
+  <xacro:macro name="box_inertia" params="m w h d">
+    <inertial>
+      <origin xyz="0 0 0" rpy="${pi/2} 0 ${pi/2}"/>
+      <mass value="${m}"/>
+      <inertia ixx="${(m/12) * (h*h + d*d)}" ixy="0.0" ixz="0.0" iyy="${(m/12) * (w*w + d*d)}" iyz="0.0" izz="${(m/12) * (w*w + h*h)}"/>
+    </inertial>
+  </xacro:macro>
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 -0.05" rpy="1.5707963267949 0 3.141592654"/>
+      <geometry>
+        <mesh filename="package://mcity_proxy/meshes/chassis.stl" />
+      </geometry>
+      <material name="Red">
+        <color rgba="${255/255} ${0/255} ${0/255} 1.0"/>
+      </material>
+    </visual>
+
+    <collision>
+      <geometry>
+        <box size="${base_length} ${base_width} ${base_height}"/>
+      </geometry>
+    </collision>
+
+    <xacro:box_inertia m="40.0" w="${base_width}" d="${base_length}" h="${base_height}"/>
+
+  </link>
+
+  <gazebo reference="base_link">
+    <material>Gazebo/Red</material>
+  </gazebo>
+
+  <!-- *********************** GPS SETUP **********************************  -->
+  <joint name="gps_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="gps_link"/>
+    <origin xyz="0.10 0 0.05" rpy="0 0 0"/>
+  </joint>
+  <link name="gps_link"/>
+
+</robot>
