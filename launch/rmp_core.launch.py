@@ -29,4 +29,3 @@ def generate_launch_description():
             arguments=["0", "0", "0", "0", "0", "0", "0", "base_link", "gps"]
         )
     ])
-

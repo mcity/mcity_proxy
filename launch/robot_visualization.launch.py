@@ -1,8 +1,3 @@
-# Author: Addison Sears-Collins
-# Date: August 27, 2021
-# Description: Launch a basic mobile robot URDF file using Rviz.
-# https://automaticaddison.com
-
 import os
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
