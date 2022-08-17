@@ -47,7 +47,9 @@
   </xacro:macro> -->
   <!-- ****************** ROBOT BASE FOOTPRINT ***************************  -->
   <!-- Define the center of the main robot chassis projected on the ground -->
-  <link name="base_footprint"/>
+  <link name="base_footprint">
+    <xacro:box_inertia m="0" w="0" d="0" h="0" xyz="0 0 0" rpy="0 0 0"/>
+  </link>
 
   <!-- The base footprint of the robot is located underneath the chassis -->
   <joint name="base_joint" type="fixed">
@@ -56,12 +58,16 @@
     <origin xyz="0.0 0.0 ${(wheel_radius+wheel_zoff)}" rpy="0 0 0"/>
   </joint>
 
+  <!-- <gazebo reference="base_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo> -->
+
   <!-- ********************** ROBOT BASE *********************************  -->
   <link name="base_link">
     <visual>
       <origin xyz="-.355 -.3450 -.200" rpy="1.5707963267949 0 0"/>
       <geometry>
-        <mesh filename="$(find mcity_proxy)/meshes/chassis.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find mcity_proxy)/meshes/chassis.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="Red">
         <color rgba="${255/255} ${0/255} ${0/255} 1.0"/>
@@ -87,7 +93,7 @@
     <visual>
       <origin xyz="-.355 -.5650 -.200" rpy="1.5707963267949 0 0"/>
       <geometry>
-        <mesh filename="$(find mcity_proxy)/meshes/steering_arm.stl" scale="0.001 0.001 0.001"/>
+        <mesh filename="file://$(find mcity_proxy)/meshes/steering_arm.stl" scale="0.001 0.001 0.001"/>
       </geometry>
       <material name="Green">
         <color rgba="${0/255} ${255/255} ${0/255} 1.0"/>
@@ -116,7 +122,7 @@
       <visual>
         <origin xyz="${-.355 - offset_multiplier * x_offset} -.5650 -.110" rpy="1.5707963267949 0 0"/>
         <geometry>
-          <mesh filename="$(find mcity_proxy)/meshes/front_wheel.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="file://$(find mcity_proxy)/meshes/front_wheel.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="White">
           <color rgba="${255/255} ${255/255} ${255/255} 1.0"/>
@@ -141,7 +147,7 @@
       <!-- <origin xyz="${x_reflect*wheel_xoff} ${y_reflect*(base_width/2+wheel_ygap)} ${-wheel_zoff}" rpy="0 0 0"/> -->
       <origin xyz="${x_offset} 0 -.09" rpy="0 0 ${z_rotate}"/>
       <!-- <limit upper="3.1415" lower="-3.1415" effort="30" velocity="5.0"/> -->
-      <axis xyz="1 0 0"/>
+      <axis xyz="${offset_multiplier * -1} 0 0"/>
     </joint>
     <gazebo reference="${prefix}_link">
       <material>Gazebo/White</material>
@@ -158,7 +164,7 @@
       <visual>
         <origin xyz="${-.355 - offset_multiplier * x_offset} -.1100 -.110" rpy="1.5707963267949 0 0"/>
         <geometry>
-          <mesh filename="$(find mcity_proxy)/meshes/back_wheel.stl" scale="0.001 0.001 0.001"/>
+          <mesh filename="file://$(find mcity_proxy)/meshes/back_wheel.stl" scale="0.001 0.001 0.001"/>
         </geometry>
         <material name="White">
           <color rgba="${255/255} ${255/255} ${255/255} 1.0"/>
@@ -202,6 +208,7 @@
         <color rgba="${0/255} ${0/255} ${255/255} 1.0"/>
       </material>
     </visual>
+    <xacro:box_inertia m="0.1" w=".042" d=".05" h=".001" xyz="0 0 0" rpy="0 0 0"/>
   </link>
   <joint name="gps_joint" type="fixed">
     <parent link="base_link"/>
@@ -211,6 +218,168 @@
   <gazebo reference="gps_link">
     <material>Gazebo/Blue</material>
   </gazebo>
-  <xacro:box_inertia m="0.1" w=".042" d=".05" h=".001" xyz="0 0 0" rpy="0 0 0"/>
+  <!-- <gazebo reference="base_joint">
+    <preserveFixedJoint>true</preserveFixedJoint>
+  </gazebo> -->
+
+  <!-- *********************** IMU SETUP *********************************  -->
+  <!-- Each sensor must be attached to a link.                              --> 
+  <link name="imu_link">
+    <visual>
+      <geometry>
+        <box size=".042 .05 .001"/>
+      </geometry>
+      <material name="Blue">
+        <color rgba="${0/255} ${0/255} ${255/255} 1.0"/>
+      </material>
+    </visual>
+    <xacro:box_inertia m="0.1" w=".042" d=".05" h=".001" xyz="0 0 0" rpy="0 0 0"/>
+  </link>
+    
+  <joint name="imu_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="imu_link"/>
+    <origin xyz="0 0 0.01"/>
+  </joint>
+    
+  <gazebo reference="imu_link">
+    <gravity>true</gravity>
+    <sensor name="twr_imu" type="imu">
+      <always_on>true</always_on>
+      <update_rate>100</update_rate>
+      <visualize>true</visualize>
+      <imu>
+        <orientation>
+          <x>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>2e-3</stddev>
+            </noise>
+          </x>
+          <y>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>2e-3</stddev>
+            </noise>
+          </y>
+          <z>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>2e-3</stddev>
+            </noise>
+          </z>
+        </orientation>
+        <angular_velocity>
+          <x>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>2e-4</stddev>
+            </noise>
+          </x>
+          <y>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>2e-4</stddev>
+            </noise>
+          </y>
+          <z>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>2e-4</stddev>
+            </noise>
+          </z>
+        </angular_velocity>
+        <linear_acceleration>
+          <x>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>1.7e-2</stddev>
+            </noise>
+          </x>
+          <y>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>1.7e-2</stddev>
+            </noise>
+          </y>
+          <z>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>1.7e-2</stddev>
+            </noise>
+          </z>
+        </linear_acceleration>
+      </imu>
+      <plugin name="rmp_imu" filename="libgazebo_ros_imu_sensor.so">
+        <initial_orientation_as_reference>false</initial_orientation_as_reference>
+        <frame_name>imu_link</frame_name>
+        <ros>
+          <namespace>/imu</namespace>
+          <remapping>~/out:=data</remapping>
+        </ros>
+      </plugin>
+    </sensor>
+  </gazebo>
+<!-- *********************** WHEEL ODOMETRY ***************************    --> 
+<gazebo>
+  <plugin name="rmp_drive_controller" filename="libgazebo_ros_diff_drive.so">
+    <ros>
+      <!-- Set namespace -->
+      <namespace>/</namespace>
+
+      <!-- Remap default topics -->
+      <!-- <remapping>cmd_vel:=cmd_demo</remapping>
+      <remapping>odom:=odom_demo</remapping> -->
+    </ros>
+
+    <!-- Update rate -->
+    <update_rate>500</update_rate>
+
+    <!-- Number of wheel pairs -->
+    <num_wheel_pairs>2</num_wheel_pairs>
+
+    <!-- wheels0 -->
+    <left_joint>frontwhl_l_joint</left_joint>
+    <right_joint>frontwhl_r_joint</right_joint>
+
+    <!-- wheels1-->
+    <left_joint>backwhl_r_joint</left_joint>
+    <right_joint>backwhl_r_joint</right_joint>
+
+    <!-- kinematics -->
+    <wheel_separation>0.55</wheel_separation>
+    <wheel_separation>0.55</wheel_separation>
+
+    <wheel_diameter>0.215</wheel_diameter>
+    <wheel_diameter>0.215</wheel_diameter>
+
+    <!-- limits -->
+    <max_wheel_torque>20</max_wheel_torque>
+    <max_wheel_acceleration>1.0</max_wheel_acceleration>
+
+    <!-- output -->
+    <publish_odom>true</publish_odom>
+    <!-- <publish_odom_tf>true</publish_odom_tf> -->
+    <!-- <publish_wheel_tf>true</publish_wheel_tf> -->
+
+    <!-- <odometry_frame>odom_demo</odometry_frame> -->
+    <robot_base_frame>base_footprint</robot_base_frame>
+  </plugin>
+</gazebo>
+
+ <!-- *********************** JOINT STATE PUBLISHER *********************   -->
+  
+  <gazebo>
+    <plugin name="rmp_joint_state" filename="libgazebo_ros_joint_state_publisher.so">
+      <ros>
+        <remapping>~/out:=joint_states</remapping>
+      </ros> 
+      <update_rate>30</update_rate>
+      <joint_name>frontwhl_l_joint</joint_name>
+      <joint_name>frontwhl_r_joint</joint_name>
+      <joint_name>backwhl_l_joint</joint_name>
+      <joint_name>backwhl_r_joint</joint_name>
+      </plugin>
+  </gazebo>
 
 </robot>

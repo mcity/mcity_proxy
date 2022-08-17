@@ -15,7 +15,9 @@ setup(
         ('share/' + package_name, glob('launch/*.launch.py')),
         ('share/' + package_name + '/meshes', glob('meshes/*.stl')),
         ('share/' + package_name + '/models', glob('models/*.urdf')),
-        ('share/' + package_name + '/rviz', glob('rviz/*.rviz'))
+        ('share/' + package_name + '/models', glob('models/*.urdf.xacro')),
+        ('share/' + package_name + '/rviz', glob('rviz/*.rviz')),
+        ('share/' + package_name + '/worlds', glob('worlds/*.world'))
     ],
     install_requires=['setuptools'],
     zip_safe=True,

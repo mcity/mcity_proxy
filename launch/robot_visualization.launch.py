@@ -11,7 +11,7 @@ def generate_launch_description():
   # Set the path to different files and folders.
   pkg_share = FindPackageShare(package='mcity_proxy').find('mcity_proxy')
   default_launch_dir = os.path.join(pkg_share, 'launch')
-  default_model_path = os.path.join(pkg_share, 'models/basic_rmp.urdf')
+  default_model_path = os.path.join(pkg_share, 'models/basic_rmp.urdf.xacro')
   robot_name_in_urdf = 'rmp_401'
   default_rviz_config_path = os.path.join(pkg_share, 'rviz/urdf_config.rviz')
 
