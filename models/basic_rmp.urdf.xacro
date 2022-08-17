@@ -217,6 +217,31 @@
   </joint>
   <gazebo reference="gps_link">
     <material>Gazebo/Blue</material>
+    <sensor name="rmp_gps" type="gps">
+      <always_on>true</always_on>
+      <update_rate>10.0</update_rate>
+      <gps>
+        <position_sensing>
+          <horizontal>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>1e-2</stddev>
+            </noise>
+          </horizontal>
+          <vertical>
+            <noise type="gaussian">
+              <mean>0.0</mean>
+              <stddev>1</stddev>
+            </noise>
+          </vertical>
+        </position_sensing>
+      </gps>
+      <plugin name="basic_mobile_bot_gps" filename="libgazebo_ros_gps_sensor.so">
+        <ros>
+          <remapping>~/out:=gps/fix</remapping>
+        </ros>
+      </plugin>
+    </sensor>
   </gazebo>
   <!-- <gazebo reference="base_joint">
     <preserveFixedJoint>true</preserveFixedJoint>
