@@ -47,9 +47,7 @@
   </xacro:macro> -->
   <!-- ****************** ROBOT BASE FOOTPRINT ***************************  -->
   <!-- Define the center of the main robot chassis projected on the ground -->
-  <link name="base_footprint">
-    <xacro:box_inertia m="0" w="0" d="0" h="0" xyz="0 0 0" rpy="0 0 0"/>
-  </link>
+  <link name="base_footprint"/>
 
   <!-- The base footprint of the robot is located underneath the chassis -->
   <joint name="base_joint" type="fixed">
@@ -236,9 +234,9 @@
           </vertical>
         </position_sensing>
       </gps>
-      <plugin name="basic_mobile_bot_gps" filename="libgazebo_ros_gps_sensor.so">
+      <plugin name="rmp_gps_plugin" filename="libgazebo_ros_gps_sensor.so">
         <ros>
-          <remapping>~/out:=gps/fix</remapping>
+          <remapping>~/out:=fix</remapping>
         </ros>
       </plugin>
     </sensor>
@@ -339,8 +337,8 @@
         <initial_orientation_as_reference>false</initial_orientation_as_reference>
         <frame_name>imu_link</frame_name>
         <ros>
-          <namespace>/imu</namespace>
-          <remapping>~/out:=data</remapping>
+          <namespace>/</namespace>
+          <remapping>~/out:=imu/data</remapping>
         </ros>
       </plugin>
     </sensor>
@@ -353,8 +351,8 @@
       <namespace>/</namespace>
 
       <!-- Remap default topics -->
-      <!-- <remapping>cmd_vel:=cmd_demo</remapping>
-      <remapping>odom:=odom_demo</remapping> -->
+      <!-- <remapping>cmd_vel:=cmd_demo</remapping> -->
+      <remapping>odom:=odometry/wheel</remapping>
     </ros>
 
     <!-- Update rate -->
@@ -384,7 +382,7 @@
 
     <!-- output -->
     <publish_odom>true</publish_odom>
-    <!-- <publish_odom_tf>true</publish_odom_tf> -->
+    <publish_odom_tf>true</publish_odom_tf>
     <!-- <publish_wheel_tf>true</publish_wheel_tf> -->
 
     <!-- <odometry_frame>odom_demo</odometry_frame> -->
@@ -404,6 +402,7 @@
       <joint_name>frontwhl_r_joint</joint_name>
       <joint_name>backwhl_l_joint</joint_name>
       <joint_name>backwhl_r_joint</joint_name>
+      <joint_name>steer_joint</joint_name>
       </plugin>
   </gazebo>
 
