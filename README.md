@@ -4,3 +4,7 @@
 * `export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/dev_ws/src/mcity_proxy/models`
 * `ros2 topic pub --once cmd_vel geometry_msgs/msg/Twist "{linear: {x: 2.0, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0}}"`
 * `rqt_robot_steering`
+
+## Documentation
+
+* ZED 2i 4mm focal length with Polarizer
