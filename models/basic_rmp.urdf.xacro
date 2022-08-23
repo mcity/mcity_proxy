@@ -56,10 +56,6 @@
     <origin xyz="0.0 0.0 ${(wheel_radius+wheel_zoff)}" rpy="0 0 0"/>
   </joint>
 
-  <!-- <gazebo reference="base_joint">
-    <preserveFixedJoint>true</preserveFixedJoint>
-  </gazebo> -->
-
   <!-- ********************** ROBOT BASE *********************************  -->
   <link name="base_link">
     <visual>
@@ -142,7 +138,7 @@
       <parent link="front_steer_link"/>
       <child link="${prefix}_link"/>
       <origin xyz="0 ${x_offset} -.09" rpy="0 0 ${z_rotate}"/>
-      <axis xyz="0 ${offset_multiplier} 0"/>
+      <axis xyz="0 ${-1 * offset_multiplier} 0"/>
     </joint>
     <gazebo reference="${prefix}_link">
       <material>Gazebo/White</material>
@@ -181,7 +177,7 @@
       <parent link="base_link"/>
       <child link="${prefix}_link"/>
       <origin xyz="-.235 ${x_offset} -.09" rpy="0 0 ${z_rotate}"/>
-      <axis xyz="0 ${offset_multiplier} 0"/>
+      <axis xyz="0 ${-1 * offset_multiplier} 0"/>
     </joint>
     <gazebo reference="${prefix}_link">
       <material>Gazebo/White</material>
@@ -376,6 +372,8 @@
         <!-- Set update_rate only sensor, not on plugin -->
         <update_rate>1</update_rate>
 
+        <visualize>true</visualize>
+
         <camera name="zed_2i">
           <distortion>
             <!-- TODO Fix distortion params -->
@@ -418,11 +416,11 @@
           -->
           <ros>
             <namespace>/</namespace>
-            <remapping>depth_cam/image_raw:=custom_camera/custom_image</remapping>
+            <!-- <remapping>depth_cam/image_raw:=custom_camera/custom_image</remapping>
             <remapping>depth_cam/image_depth:=custom_camera/custom_image_depth</remapping>
             <remapping>depth_cam/camera_info:=custom_camera/custom_info_raw</remapping>
             <remapping>depth_cam/camera_info_depth:=custom_camera/custom_info_depth</remapping>
-            <remapping>depth_cam/points:=custom_camera/custom_points</remapping>
+            <remapping>depth_cam/points:=custom_camera/custom_points</remapping> -->
           </ros>
 
           <!-- Set camera name. If empty, defaults to sensor name (i.e. "sensor_name") -->
@@ -485,6 +483,11 @@
   
       <!-- <odometry_frame>odom_demo</odometry_frame> -->
       <robot_base_frame>base_footprint</robot_base_frame>
+
+      <!-- Odometry source, 0 for ENCODER, 1 for WORLD, defaults to WORLD -->
+      <odometry_source>1</odometry_source>
+      <odometry_topic>odom</odometry_topic>
+      <odometry_frame>odom</odometry_frame>
     </plugin>
   </gazebo>
 

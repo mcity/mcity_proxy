@@ -17,9 +17,9 @@ def generate_launch_description():
     gazebo_models_path = "models"
     package_name = "mcity_proxy"
     robot_name_in_model = "rmp_401"
-    rviz_config_file_path = "rviz/urdf_config.rviz"
+    rviz_config_file_path = "rviz/nav2_config.rviz"
     urdf_file_path = "models/basic_rmp.urdf.xacro"
-    world_file_path = "worlds/neighborhood.world"
+    world_file_path = "worlds/smalltown.world"
 
     # Pose where we want to spawn the robot
     spawn_x_val = "0.0"
@@ -36,12 +36,26 @@ def generate_launch_description():
     gazebo_models_path = os.path.join(pkg_share, gazebo_models_path)
     os.environ["GAZEBO_MODEL_PATH"] = gazebo_models_path
     robot_localization_file_path = os.path.join(pkg_share, "config/ekf.yaml")
+    nav2_dir = FindPackageShare(package="nav2_bringup").find("nav2_bringup")
+    nav2_launch_dir = os.path.join(nav2_dir, "launch")
+    static_map_path = os.path.join(pkg_share, "maps", "smalltown_world.yaml")
+    nav2_params_path = os.path.join(pkg_share, "params", "nav2_params.yaml")
+    nav2_bt_path = FindPackageShare(package="nav2_bt_navigator").find(
+        "nav2_bt_navigator"
+    )
+    behavior_tree_xml_path = os.path.join(
+        nav2_bt_path, "behavior_trees", "navigate_w_replanning_and_recovery.xml"
+    )
 
     # Launch configuration variables specific to simulation
+    autostart = LaunchConfiguration("autostart")
+    default_bt_xml_filename = LaunchConfiguration("default_bt_xml_filename")
+    map_yaml_file = LaunchConfiguration("map")
+    params_file = LaunchConfiguration("params_file")
+    slam = LaunchConfiguration("slam")
     gui = LaunchConfiguration("gui")
     headless = LaunchConfiguration("headless")
     namespace = LaunchConfiguration("namespace")
-    model = LaunchConfiguration("model")
     rviz_config_file = LaunchConfiguration("rviz_config_file")
     urdf_model = LaunchConfiguration("urdf_model")
     use_namespace = LaunchConfiguration("use_namespace")
@@ -50,6 +64,14 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_simulator = LaunchConfiguration("use_simulator")
     world = LaunchConfiguration("world")
+
+    # Map fully qualified names to relative ones so the node's namespace can be prepended.
+    # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
+    # https://github.com/ros/geometry2/issues/32
+    # https://github.com/ros/robot_state_publisher/pull/30
+    # TODO Substitute with `PushNodeRemapping`
+    #              https://github.com/ros2/launch_ros/issues/56
+    remappings = [("/tf", "tf"), ("/tf_static", "tf_static")]
 
     # Declare the launch arguments
     declare_use_joint_state_publisher_cmd = DeclareLaunchArgument(
@@ -60,6 +82,34 @@ def generate_launch_description():
 
     declare_namespace_cmd = DeclareLaunchArgument(
         name="namespace", default_value="", description="Top-level namespace"
+    )
+
+    declare_autostart_cmd = DeclareLaunchArgument(
+        name="autostart",
+        default_value="true",
+        description="Automatically startup the nav2 stack",
+    )
+
+    declare_bt_xml_cmd = DeclareLaunchArgument(
+        name="default_bt_xml_filename",
+        default_value=behavior_tree_xml_path,
+        description="Full path to the behavior tree xml file to use",
+    )
+
+    declare_map_yaml_cmd = DeclareLaunchArgument(
+        name="map",
+        default_value=static_map_path,
+        description="Full path to map file to load",
+    )
+
+    declare_params_file_cmd = DeclareLaunchArgument(
+        name="params_file",
+        default_value=nav2_params_path,
+        description="Full path to the ROS2 parameters file to use for all launched nodes",
+    )
+
+    declare_slam_cmd = DeclareLaunchArgument(
+        name="slam", default_value="False", description="Whether to run SLAM"
     )
 
     declare_use_namespace_cmd = DeclareLaunchArgument(
@@ -138,6 +188,7 @@ def generate_launch_description():
                 "use_sim_time": use_sim_time,
                 "magnetic_declination_radians": "0",
                 "yaw_offset": "0",
+                "zero_altitude": True,
             }
         ],
     )
@@ -209,11 +260,44 @@ def generate_launch_description():
         parameters=[{"use_sim_time": use_sim_time}],
     )
 
+    # Launch the ROS 2 Navigation Stack
+    start_ros2_navigation_cmd = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(nav2_launch_dir, "bringup_launch.py")
+        ),
+        launch_arguments={
+            "namespace": namespace,
+            "use_namespace": use_namespace,
+            "slam": slam,
+            "map": map_yaml_file,
+            "use_sim_time": use_sim_time,
+            "params_file": params_file,
+            "default_bt_xml_filename": default_bt_xml_filename,
+            "autostart": autostart,
+        }.items(),
+    )
+
     # Steering controls
     start_robot_steering_cmd = Node(
         package="rqt_robot_steering",
         executable="rqt_robot_steering",
         parameters=[{"use_sim_time": use_sim_time}],
+    )
+
+    # Pull a laserscan from the ZED Camera
+    start_depthimage_to_laserscan_cmd = Node(
+        package="depthimage_to_laserscan",
+        executable="depthimage_to_laserscan_node",
+        parameters=[{
+            "use_sim_time": use_sim_time,
+            "range_min": 1.5,
+            "range_max": 35.0,
+            "output_frame": "camera_link"
+        }],
+        remappings=[
+            ('depth', 'zed_2i/depth/image_raw'),
+            ('depth_camera_info', 'zed_2i/depth/camera_info')
+        ]
     )
 
     # Create the launch description and populate
@@ -231,6 +315,11 @@ def generate_launch_description():
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_use_simulator_cmd)
     ld.add_action(declare_world_cmd)
+    ld.add_action(declare_autostart_cmd)
+    ld.add_action(declare_bt_xml_cmd)
+    ld.add_action(declare_map_yaml_cmd)
+    ld.add_action(declare_params_file_cmd)
+    ld.add_action(declare_slam_cmd)
 
     # Add any actions
     ld.add_action(start_gazebo_server_cmd)
@@ -241,5 +330,7 @@ def generate_launch_description():
     ld.add_action(start_rviz_cmd)
     ld.add_action(start_robot_steering_cmd)
     ld.add_action(start_robot_localization_cmd)
+    ld.add_action(start_ros2_navigation_cmd)
+    ld.add_action(start_depthimage_to_laserscan_cmd)
 
     return ld
