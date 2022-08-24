@@ -64,6 +64,7 @@ def generate_launch_description():
     use_sim_time = LaunchConfiguration("use_sim_time")
     use_simulator = LaunchConfiguration("use_simulator")
     world = LaunchConfiguration("world")
+    steering = LaunchConfiguration("steering")
 
     # Map fully qualified names to relative ones so the node's namespace can be prepended.
     # In case of the transforms (tf), currently, there doesn't seem to be a better alternative
@@ -164,6 +165,12 @@ def generate_launch_description():
         description="Full path to the world model file to load",
     )
 
+    declare_steering_cmd = DeclareLaunchArgument(
+        name="steering",
+        default_value="True",
+        description="Determines whether or not to start the rqt_robot_steering node."
+    )
+
     # Subscribe to the joint states of the robot, and publish the 3D pose of each link.
     start_robot_state_publisher_cmd = Node(
         package="robot_state_publisher",
@@ -219,6 +226,7 @@ def generate_launch_description():
         output="screen",
         arguments=["-d", rviz_config_file],
         parameters=[{"use_sim_time": use_sim_time}],
+        condition=IfCondition(gui)
     )
 
     # Start Gazebo server
@@ -282,6 +290,7 @@ def generate_launch_description():
         package="rqt_robot_steering",
         executable="rqt_robot_steering",
         parameters=[{"use_sim_time": use_sim_time}],
+        condition=IfCondition(steering),
     )
 
     # Pull a laserscan from the ZED Camera
@@ -320,6 +329,7 @@ def generate_launch_description():
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_params_file_cmd)
     ld.add_action(declare_slam_cmd)
+    ld.add_action(declare_steering_cmd)
 
     # Add any actions
     ld.add_action(start_gazebo_server_cmd)

@@ -462,7 +462,7 @@
       <right_joint>frontwhl_r_joint</right_joint>
 
       <!-- wheels1-->
-      <left_joint>backwhl_r_joint</left_joint>
+      <left_joint>backwhl_l_joint</left_joint>
       <right_joint>backwhl_r_joint</right_joint>
 
       <!-- kinematics -->
