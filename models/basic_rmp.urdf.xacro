@@ -97,11 +97,11 @@
     <xacro:box_inertia m="5.0" w=".46" d=".09" h=".20" xyz="0 0 0" rpy="0 0 0"/>
 
   </link>
-  <joint name="steer_joint" type="revolute">
+  <joint name="steer_joint" type="fixed">
     <parent link="base_link"/>
     <child link="front_steer_link"/>
     <origin xyz="0.22 0 0" rpy="0 0 0"/>
-    <limit upper="0.36" lower="-0.36" effort="30" velocity="5.0"/>
+    <!-- <limit upper="0.36" lower="-0.36" effort="30" velocity="5.0"/> -->
     <axis xyz="0 0 1"/>
   </joint>
 
@@ -114,7 +114,7 @@
   <xacro:macro name="front_wheel" params="prefix x_offset offset_multiplier z_rotate">
     <link name="${prefix}_link">
       <visual>
-        <origin xyz="-.5650 ${.355 + offset_multiplier * x_offset} -.110" rpy="1.5707963267949 0 -${pi/2}"/>
+        <origin xyz="-.5650 ${.355 - offset_multiplier * x_offset} -.110" rpy="1.5707963267949 0 -${pi/2}"/>
         <geometry>
           <mesh filename="file://$(find mcity_proxy)/meshes/front_wheel.stl" scale="0.001 0.001 0.001"/>
         </geometry>
@@ -137,8 +137,8 @@
     <joint name="${prefix}_joint" type="continuous">
       <parent link="front_steer_link"/>
       <child link="${prefix}_link"/>
-      <origin xyz="0 ${x_offset} -.09" rpy="0 0 ${z_rotate}"/>
-      <axis xyz="0 ${-1 * offset_multiplier} 0"/>
+      <origin xyz="0 ${-x_offset} -.09" rpy="0 0 ${z_rotate}"/>
+      <axis xyz="0 ${-offset_multiplier} 0"/>
     </joint>
     <gazebo reference="${prefix}_link">
       <material>Gazebo/White</material>
@@ -153,7 +153,7 @@
   <xacro:macro name="back_wheel" params="prefix x_offset offset_multiplier z_rotate">
     <link name="${prefix}_link">
       <visual>
-        <origin xyz="-.1100 ${.355 + offset_multiplier * x_offset} -.110" rpy="1.5707963267949 0 -${pi/2}"/>
+        <origin xyz="-.1100 ${.355 - offset_multiplier * x_offset} -.110" rpy="1.5707963267949 0 -${pi/2}"/>
         <geometry>
           <mesh filename="file://$(find mcity_proxy)/meshes/back_wheel.stl" scale="0.001 0.001 0.001"/>
         </geometry>
@@ -176,8 +176,8 @@
     <joint name="${prefix}_joint" type="continuous">
       <parent link="base_link"/>
       <child link="${prefix}_link"/>
-      <origin xyz="-.235 ${x_offset} -.09" rpy="0 0 ${z_rotate}"/>
-      <axis xyz="0 ${-1 * offset_multiplier} 0"/>
+      <origin xyz="-.235 ${-x_offset} -.09" rpy="0 0 ${z_rotate}"/>
+      <axis xyz="0 ${-offset_multiplier} 0"/>
     </joint>
     <gazebo reference="${prefix}_link">
       <material>Gazebo/White</material>
@@ -234,7 +234,7 @@
   </gazebo>
 
   <!-- *********************** IMU SETUP *********************************  -->
-  <!-- Each sensor must be attached to a link.                              --> 
+  <!-- Each sensor must be attached to a link.                              -->
   <link name="imu_link">
     <visual>
       <geometry>
@@ -246,13 +246,13 @@
     </visual>
     <xacro:box_inertia m="0.1" w=".05" d=".042" h=".001" xyz="0 0 0" rpy="0 0 0"/>
   </link>
-    
+
   <joint name="imu_joint" type="fixed">
     <parent link="base_link"/>
     <child link="imu_link"/>
     <origin xyz="0 0 0.01"/>
   </joint>
-    
+
   <gazebo reference="imu_link">
     <gravity>true</gravity>
     <sensor name="twr_imu" type="imu">
@@ -332,7 +332,7 @@
     </sensor>
   </gazebo>
 
-  <!-- *********************** ZED 2i SENSOR  ***************************    --> 
+  <!-- *********************** ZED 2i SENSOR  ***************************    -->
   <link name="camera_link">
     <visual>
       <geometry>
@@ -345,7 +345,7 @@
     </visual>
     <xacro:box_inertia m="0.224" w=".175" d=".3" h=".43" xyz="0 0 0" rpy="0 0 0"/>
   </link>
-    
+
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
@@ -437,11 +437,11 @@
           <max_depth>35</max_depth>
       </plugin>
     </sensor>
-  
+
   </gazebo>
 
 
-  <!-- *********************** WHEEL ODOMETRY ***************************    --> 
+  <!-- *********************** WHEEL ODOMETRY ***************************    -->
   <gazebo>
     <plugin name="rmp_drive_controller" filename="libgazebo_ros_diff_drive.so">
       <ros>
@@ -450,37 +450,37 @@
         <!-- Remap default topics -->
         <remapping>odom:=odometry/wheel</remapping>
       </ros>
-  
+
       <!-- Update rate -->
       <update_rate>500</update_rate>
-  
+
       <!-- Number of wheel pairs -->
       <num_wheel_pairs>2</num_wheel_pairs>
-  
+
       <!-- wheels0 -->
       <left_joint>frontwhl_l_joint</left_joint>
       <right_joint>frontwhl_r_joint</right_joint>
-  
+
       <!-- wheels1-->
       <left_joint>backwhl_r_joint</left_joint>
       <right_joint>backwhl_r_joint</right_joint>
-  
+
       <!-- kinematics -->
       <wheel_separation>0.55</wheel_separation>
       <wheel_separation>0.55</wheel_separation>
-  
+
       <wheel_diameter>0.215</wheel_diameter>
       <wheel_diameter>0.215</wheel_diameter>
-  
+
       <!-- limits -->
-      <max_wheel_torque>20</max_wheel_torque>
-      <max_wheel_acceleration>1.0</max_wheel_acceleration>
-  
+      <max_wheel_torque>50</max_wheel_torque>
+      <max_wheel_acceleration>2.0</max_wheel_acceleration>
+
       <!-- output -->
       <publish_odom>true</publish_odom>
       <publish_odom_tf>true</publish_odom_tf>
       <!-- <publish_wheel_tf>true</publish_wheel_tf> -->
-  
+
       <!-- <odometry_frame>odom_demo</odometry_frame> -->
       <robot_base_frame>base_footprint</robot_base_frame>
 
@@ -496,7 +496,7 @@
     <plugin name="rmp_joint_state" filename="libgazebo_ros_joint_state_publisher.so">
       <ros>
         <remapping>~/out:=joint_states</remapping>
-      </ros> 
+      </ros>
       <update_rate>30</update_rate>
       <joint_name>frontwhl_l_joint</joint_name>
       <joint_name>frontwhl_r_joint</joint_name>
