@@ -168,7 +168,7 @@ def generate_launch_description():
     declare_steering_cmd = DeclareLaunchArgument(
         name="steering",
         default_value="True",
-        description="Determines whether or not to start the rqt_robot_steering node."
+        description="Determines whether or not to start the rqt_robot_steering node.",
     )
 
     # Subscribe to the joint states of the robot, and publish the 3D pose of each link.
@@ -226,7 +226,7 @@ def generate_launch_description():
         output="screen",
         arguments=["-d", rviz_config_file],
         parameters=[{"use_sim_time": use_sim_time}],
-        condition=IfCondition(gui)
+        condition=IfCondition(gui),
     )
 
     # Start Gazebo server
@@ -297,16 +297,18 @@ def generate_launch_description():
     start_depthimage_to_laserscan_cmd = Node(
         package="depthimage_to_laserscan",
         executable="depthimage_to_laserscan_node",
-        parameters=[{
-            "use_sim_time": use_sim_time,
-            "range_min": 1.5,
-            "range_max": 35.0,
-            "output_frame": "camera_link"
-        }],
+        parameters=[
+            {
+                "use_sim_time": use_sim_time,
+                "range_min": 1.5,
+                "range_max": 35.0,
+                "output_frame": "camera_link",
+            }
+        ],
         remappings=[
-            ('depth', 'zed_2i/depth/image_raw'),
-            ('depth_camera_info', 'zed_2i/depth/camera_info')
-        ]
+            ("depth", "zed_2i/depth/image_raw"),
+            ("depth_camera_info", "zed_2i/depth/camera_info"),
+        ],
     )
 
     # Create the launch description and populate
