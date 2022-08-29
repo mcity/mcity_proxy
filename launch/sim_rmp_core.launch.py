@@ -24,8 +24,8 @@ def generate_launch_description():
     # Pose where we want to spawn the robot
     spawn_x_val = "0.0"
     spawn_y_val = "0.0"
-    spawn_z_val = "0.0"
-    spawn_yaw_val = "0.00"
+    spawn_z_val = "0.2"
+    spawn_yaw_val = "0.0"
 
     # Set the path to different files and folders.
     pkg_gazebo_ros = FindPackageShare(package="gazebo_ros").find("gazebo_ros")

@@ -97,11 +97,12 @@
     <xacro:box_inertia m="5.0" w=".46" d=".09" h=".20" xyz="0 0 0" rpy="0 0 0"/>
 
   </link>
-  <joint name="steer_joint" type="fixed">
+  <joint name="steer_joint" type="revolute">
     <parent link="base_link"/>
     <child link="front_steer_link"/>
     <origin xyz="0.22 0 0" rpy="0 0 0"/>
-    <!-- <limit upper="0.36" lower="-0.36" effort="30" velocity="5.0"/> -->
+    <limit upper="0.36" lower="-0.36" effort="1" velocity="5.0"/>
+    <joint_properties damping="1.0" friction="1.0"/>
     <axis xyz="0 0 1"/>
   </joint>
 
@@ -139,9 +140,23 @@
       <child link="${prefix}_link"/>
       <origin xyz="0 ${-x_offset} -.09" rpy="0 0 ${z_rotate}"/>
       <axis xyz="0 ${-offset_multiplier} 0"/>
+      <joint_properties damping="1.0" friction="1.0"/>
     </joint>
     <gazebo reference="${prefix}_link">
       <material>Gazebo/White</material>
+      <collision>
+        <friction>
+          <mu1>1.4</mu1>
+          <mu2>1.4</mu2>
+          <fdir1>1 0 0</fdir1>
+          <kp>1000000.0</kp>
+          <kd>100.0</kd>
+          <minDepth>0.01</minDepth>
+          <maxContacts>1</maxContacts>
+          <slip1>1.0</slip1>
+          <slip2>0.0</slip2>
+        </friction>
+      </collision>
     </gazebo>
   </xacro:macro>
 
@@ -178,9 +193,23 @@
       <child link="${prefix}_link"/>
       <origin xyz="-.235 ${-x_offset} -.09" rpy="0 0 ${z_rotate}"/>
       <axis xyz="0 ${-offset_multiplier} 0"/>
+      <joint_properties damping="1.0" friction="1.0"/>
     </joint>
     <gazebo reference="${prefix}_link">
       <material>Gazebo/White</material>
+      <collision>
+        <friction>
+          <mu1>1.4</mu1>
+          <mu2>1.4</mu2>
+          <fdir1>1 0 0</fdir1>
+          <kp>1000000.0</kp>
+          <kd>100.0</kd>
+          <minDepth>0.01</minDepth>
+          <maxContacts>1</maxContacts>
+          <slip1>1.0</slip1>
+          <slip2>0.0</slip2>
+        </friction>
+      </collision>
     </gazebo>
   </xacro:macro>
 
@@ -473,8 +502,8 @@
       <wheel_diameter>0.215</wheel_diameter>
 
       <!-- limits -->
-      <max_wheel_torque>50</max_wheel_torque>
-      <max_wheel_acceleration>2.0</max_wheel_acceleration>
+      <max_wheel_torque>1000</max_wheel_torque>
+      <max_wheel_acceleration>10.0</max_wheel_acceleration>
 
       <!-- output -->
       <publish_odom>true</publish_odom>
@@ -488,6 +517,10 @@
       <odometry_source>1</odometry_source>
       <odometry_topic>odom</odometry_topic>
       <odometry_frame>odom</odometry_frame>
+
+      <covariance_x>0.001</covariance_x> <!-- 0.0001 -->
+      <covariance_y>0.001</covariance_y> <!-- 0.0001 -->
+      <covariance_yaw>0.01</covariance_yaw> <!-- 0.01 -->
     </plugin>
   </gazebo>
 
