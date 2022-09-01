@@ -10,6 +10,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import Command, LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+from ament_index_python.packages import get_package_share_directory
 
 
 def generate_launch_description():
@@ -30,8 +31,8 @@ def generate_launch_description():
             remappings=[("/odometry/filtered", "/odometry/navsat_transformed")],
             parameters=[
                 {
-                    "magnetic_declination_radians": "0",
-                    "yaw_offset": "0",
+                    "magnetic_declination_radians": 0.0,
+                    "yaw_offset": 0.0,
                     "zero_altitude": True,
                 }
             ],
@@ -75,7 +76,7 @@ def generate_launch_description():
             name="rviz2",
             output="screen",
             arguments=["-d", rviz_config_file],
-            condition=IfCondition(rviz_toggle_arg),
+            condition=IfCondition(rviz_toggle),
         )
     )
 
@@ -116,13 +117,13 @@ def generate_launch_description():
                     "robot_description": Command(["xacro ", urdf_model]),
                 }
             ],
-            condition=IfCondition(robot_state_toggle_arg),
+            condition=IfCondition(robot_state_toggle),
         )
     )
     # Publish the joint state values for the non-fixed joints in the URDF file.
     ld.add_action(
         Node(
-            condition=IfCondition(joint_state_toggle_arg),
+            condition=IfCondition(joint_state_toggle),
             package="joint_state_publisher",
             executable="joint_state_publisher",
             name="joint_state_publisher",
@@ -142,7 +143,7 @@ def generate_launch_description():
     )
     ld.add_action(params_file_arg)
     # Map Config
-    static_map_path = ""
+    static_map_path = os.path.join(pkg_share, "maps", "empty_map.yaml")
     map_yaml_file = LaunchConfiguration("map")
     map_arg = DeclareLaunchArgument(
         name="map",
@@ -177,14 +178,22 @@ def generate_launch_description():
         description="Whether to apply a namespace to the navigation stack",
     )
     ld.add_action(use_namespace_arg)
+    # Nav2 Toggle
+    nav_toggle = LaunchConfiguration("nav_toggle")
+    nav_toggle_arg = DeclareLaunchArgument(
+        name="nav_toggle",
+        default_value="true",
+        description="Toggle the nav2 stack on or off.",
+    )
+    ld.add_action(nav_toggle_arg)
     # Nav2 Autostart Config
-    nav_autostart_toggle = LaunchConfiguration("nav_autostart_toggle")
-    nav_autostart_toggle_arg = DeclareLaunchArgument(
-        name="nav_autostart_toggle",
+    autostart_toggle = LaunchConfiguration("autostart_toggle")
+    autostart_toggle_arg = DeclareLaunchArgument(
+        name="autostart_toggle",
         default_value="true",
         description="Automatically startup the nav2 stack",
     )
-    ld.add_action(nav_autostart_toggle_arg)
+    ld.add_action(autostart_toggle_arg)
     # Slam Config
     slam_toggle = LaunchConfiguration("slam_toggle")
     slam_toggle_arg = DeclareLaunchArgument(
@@ -211,8 +220,9 @@ def generate_launch_description():
                 "map": map_yaml_file,
                 "params_file": params_file,
                 "default_bt_xml_filename": default_bt_xml_filename,
-                "autostart": nav_autostart_toggle,
+                "autostart": autostart_toggle,
             }.items(),
+            condition=IfCondition(nav_toggle)
         )
     )
 
@@ -228,7 +238,7 @@ def generate_launch_description():
         Node(
             package="rqt_robot_steering",
             executable="rqt_robot_steering",
-            condition=IfCondition(steering_toggle_arg),
+            condition=IfCondition(steering_toggle),
         )
     )
 
@@ -242,13 +252,60 @@ def generate_launch_description():
         description="Determines whether or not to start the ZED 2i ROS wrapper.",
     )
     ld.add_action(zed_toggle_arg)
+    svo_path = LaunchConfiguration("svo_path")
+    svo_path_arg = DeclareLaunchArgument(
+        "svo_path",
+        default_value="live",  # 'live' used as patch for launch files not allowing empty strings as default parameters
+        description="Path to an input SVO file. Note: overrides the parameter `general.svo_file` in `common.yaml`.",
+    )
+    ld.add_action(svo_path_arg)
     # Launch ZED 2i ROS Wrapper
+    # ld.add_action(
+    #     IncludeLaunchDescription(
+    #         PythonLaunchDescriptionSource(
+    #             os.path.join(zed_launch_dir, "zed2i.launch.py")
+    #         ),
+    #         condition=IfCondition(zed_toggle),
+    #     )
+    # )
+
+    # ZED Wrapper node
     ld.add_action(
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(zed_launch_dir, "zed2i.launch.py")
+            launch_description_source=PythonLaunchDescriptionSource(
+                [
+                    get_package_share_directory("zed_wrapper"),
+                    "/launch/include/zed_camera.launch.py",
+                ]
             ),
-            condition=IfCondition(zed_toggle_arg),
+            condition=IfCondition(zed_toggle),
+            launch_arguments={
+                "camera_model": "zed2i",
+                "camera_name": "zed2i",
+                "node_name": 'zed_node',
+                "config_common_path": os.path.join(
+                    get_package_share_directory("zed_wrapper"), "config", "common.yaml"
+                ),
+                "config_camera_path": os.path.join(
+                    get_package_share_directory("zed_wrapper"),
+                    "config",
+                    "zed2i.yaml",
+                ),
+                "publish_urdf": "true",
+                "xacro_path": os.path.join(
+                    get_package_share_directory("zed_wrapper"),
+                    "urdf",
+                    "zed_descr.urdf.xacro",
+                ),
+                "svo_path": svo_path,
+                "base_frame": "base_footprint",
+                "cam_pos_x": "0.3",
+                "cam_pos_y": "0.0",
+                "cam_pos_z": "0.2525",
+                "cam_roll": "0.0",
+                "cam_pitch": "0.0",
+                "cam_yaw": "0.0",
+            }.items(),
         )
     )
     # Pull a laserscan from the ZED Camera
@@ -282,11 +339,10 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(
                 os.path.join(ublox_launch_dir, "ublox_gps_node-launch.py")
             ),
-            condition=IfCondition(ublox_toggle_arg),
+            condition=IfCondition(ublox_toggle),
         )
     )
-    ntrip_dir = FindPackageShare(package="ntrip_client").find("ntrip_client")
-    ntrip_launch_dir = os.path.join(ntrip_dir, "launch")
+    ntrip_launch_dir = FindPackageShare(package="ntrip_client").find("ntrip_client")
     ntrip_toggle = LaunchConfiguration("ntrip_toggle")
     ntrip_toggle_arg = DeclareLaunchArgument(
         name="ntrip_toggle",
@@ -304,23 +360,23 @@ def generate_launch_description():
     ntrip_port = LaunchConfiguration("ntrip_port")
     ntrip_port_arg = DeclareLaunchArgument(
         name="ntrip_port",
-        default_value="2101",
+        default_value="2102",
         description="Set port number of NTRIP server",
     )
     ld.add_action(ntrip_port_arg)
-    ntrip_mountpoint_arg = LaunchConfiguration("ntrip_mountpoint")
+    ntrip_mountpoint = LaunchConfiguration("ntrip_mountpoint")
     ntrip_mountpoint_arg = DeclareLaunchArgument(
         name="ntrip_mountpoint",
         default_value="MTF",
         description="Set mountpoint of NTRIP server",
     )
     ld.add_action(ntrip_mountpoint_arg)
-    ntrip_username_arg = LaunchConfiguration("ntrip_username")
+    ntrip_username = LaunchConfiguration("ntrip_username")
     ntrip_username_arg = DeclareLaunchArgument(
         name="ntrip_username", description="Set username of NTRIP server"
     )
     ld.add_action(ntrip_username_arg)
-    ntrip_password_arg = LaunchConfiguration("ntrip_password")
+    ntrip_password = LaunchConfiguration("ntrip_password")
     ntrip_password_arg = DeclareLaunchArgument(
         name="ntrip_password", description="Set password of NTRIP server"
     )
@@ -332,13 +388,13 @@ def generate_launch_description():
                 os.path.join(ntrip_launch_dir, "ntrip_client_launch.py")
             ),
             launch_arguments={
-                "host": ntrip_host_arg,
-                "port": ntrip_port_arg,
-                "mountpoint": ntrip_mountpoint_arg,
-                "username": ntrip_username_arg,
-                "password": ntrip_password_arg,
+                "host": ntrip_host,
+                "port": ntrip_port,
+                "mountpoint": ntrip_mountpoint,
+                "username": ntrip_username,
+                "password": ntrip_password,
             }.items(),
-            condition=IfCondition(ntrip_toggle_arg),
+            condition=IfCondition(ntrip_toggle),
         )
     )
 
@@ -355,7 +411,7 @@ def generate_launch_description():
         Node(
             package="segwayrmp",
             executable="SmartCar",
-            condition=IfCondition(segway_toggle_arg),
+            condition=IfCondition(segway_toggle),
         )
     )
     ld.add_action(
@@ -367,7 +423,7 @@ def generate_launch_description():
                     "1 ",
                 ]
             ],
-            condition=IfCondition(segway_toggle_arg),
+            condition=IfCondition(segway_toggle),
         )
     )
 
@@ -384,7 +440,7 @@ def generate_launch_description():
         Node(
             package="mcity_proxy",
             executable="mcity_proxy",
-            condition=IfCondition(mcity_proxy_toggle_arg),
+            condition=IfCondition(mcity_proxy_toggle),
         )
     )
 
