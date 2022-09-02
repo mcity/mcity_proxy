@@ -7,7 +7,7 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PythonExpression
+from launch.substitutions import Command, LaunchConfiguration, PythonExpression, FindExecutable
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
@@ -18,6 +18,23 @@ def generate_launch_description():
     ld = LaunchDescription()
     package_name = "mcity_proxy"
     pkg_share = FindPackageShare(package=package_name).find(package_name)
+
+    # * Mcity Autonomous Proxy Functionality *
+    mcity_proxy_toggle = LaunchConfiguration("mcity_proxy_toggle")
+    mcity_proxy_toggle_arg = DeclareLaunchArgument(
+        name="mcity_proxy_toggle",
+        default_value="True",
+        description="Determines whether or not to start the Mcity Autonomous Proxy Functionality.",
+    )
+    ld.add_action(mcity_proxy_toggle_arg)
+    # Launch Proxy Functionality
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
+            executable="mcity_proxy",
+            condition=IfCondition(mcity_proxy_toggle),
+        )
+    )
 
     # * ROBOT LOCALIZATION *
     robot_localization_file_path = os.path.join(pkg_share, "config/ekf.yaml")
@@ -407,41 +424,28 @@ def generate_launch_description():
     )
     ld.add_action(segway_toggle_arg)
     # Launch Segway RMP ROS Wrapper
-    ld.add_action(
-        Node(
-            package="segwayrmp",
-            executable="SmartCar",
-            condition=IfCondition(segway_toggle),
-        )
-    )
+    #ld.add_action(
+    #    Node(
+    #        package="segwayrmp",
+    #        executable="SmartCar",
+    #        condition=IfCondition(segway_toggle),
+    #    )
+    #)
     ld.add_action(
         ExecuteProcess(
             cmd=[
                 [
-                    "ros2 service call ",
-                    "/ros_set_chassis_enable_cmd_srv ",
-                    "1 ",
+                    FindExecutable(name='ros2'),
+                    " service call ",
+                    "/set_chassis_enable ",
+                    "segway_msgs/srv/RosSetChassisEnableCmd ",
+                    '"{ros_set_chassis_enable_cmd: True}"',
                 ]
             ],
+            shell=True,
             condition=IfCondition(segway_toggle),
         )
     )
 
-    # * Mcity Autonomous Proxy Functionality *
-    mcity_proxy_toggle = LaunchConfiguration("mcity_proxy_toggle")
-    mcity_proxy_toggle_arg = DeclareLaunchArgument(
-        name="mcity_proxy_toggle",
-        default_value="True",
-        description="Determines whether or not to start the Mcity Autonomous Proxy Functionality.",
-    )
-    ld.add_action(mcity_proxy_toggle_arg)
-    # Launch Proxy Functionality
-    ld.add_action(
-        Node(
-            package="mcity_proxy",
-            executable="mcity_proxy",
-            condition=IfCondition(mcity_proxy_toggle),
-        )
-    )
 
     return ld

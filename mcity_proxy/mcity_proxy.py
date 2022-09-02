@@ -16,7 +16,7 @@ class Cmd_Vel_Spin(Node):
         self.subscriber_ = self.create_subscription(
             Twist, "cmd_vel", self.subscriber_callback, 10
         )
-        timer_period = 0.5  # seconds
+        timer_period = 0.1  # seconds
         self.timer = self.create_timer(timer_period, self.timer_callback)
 
     def subscriber_callback(self, msg):
