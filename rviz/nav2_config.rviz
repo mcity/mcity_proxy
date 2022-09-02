@@ -276,7 +276,7 @@ Visualization Manager:
       Enabled: true
       Name: Controller
     - Class: rviz_default_plugins/MarkerArray
-      Enabled: true
+      Enabled: false
       Name: MarkerArray
       Namespaces:
         {}
