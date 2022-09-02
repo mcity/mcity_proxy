@@ -273,7 +273,7 @@ Visualization Manager:
             Reliability Policy: Reliable
             Value: /local_costmap/published_footprint
           Value: true
-      Enabled: true
+      Enabled: false
       Name: Controller
     - Class: rviz_default_plugins/MarkerArray
       Enabled: false
