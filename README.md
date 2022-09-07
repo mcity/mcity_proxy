@@ -43,4 +43,6 @@ fi
 export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/dev_ws/src/mcity_proxy/models
 export PATH=$PATH:/home/luckierdodge/.local/bin
 export ROS_DOMAIN_ID=60
+export NTRIP_USERNAME="PUT THE NTRIP USERNAME HERE"
+export NTRIP_PASSWORD="PUT THE NTRIP PASSWORD HERE"
 ```

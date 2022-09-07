@@ -390,12 +390,12 @@ def generate_launch_description():
     ld.add_action(ntrip_mountpoint_arg)
     ntrip_username = LaunchConfiguration("ntrip_username")
     ntrip_username_arg = DeclareLaunchArgument(
-        name="ntrip_username", description="Set username of NTRIP server"
+        name="ntrip_username", description="Set username of NTRIP server", default_value=os.getenv("NTRIP_USERNAME")
     )
     ld.add_action(ntrip_username_arg)
     ntrip_password = LaunchConfiguration("ntrip_password")
     ntrip_password_arg = DeclareLaunchArgument(
-        name="ntrip_password", description="Set password of NTRIP server"
+        name="ntrip_password", description="Set password of NTRIP server", default_value=os.getenv("NTRIP_PASSWORD")
     )
     ld.add_action(ntrip_password_arg)
     # Launch NTRIP Client
