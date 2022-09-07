@@ -7,7 +7,12 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PythonExpression, FindExecutable
+from launch.substitutions import (
+    Command,
+    LaunchConfiguration,
+    PythonExpression,
+    FindExecutable,
+)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
@@ -239,7 +244,7 @@ def generate_launch_description():
                 "default_bt_xml_filename": default_bt_xml_filename,
                 "autostart": autostart_toggle,
             }.items(),
-            condition=IfCondition(nav_toggle)
+            condition=IfCondition(nav_toggle),
         )
     )
 
@@ -299,7 +304,7 @@ def generate_launch_description():
             launch_arguments={
                 "camera_model": "zed2i",
                 "camera_name": "zed2i",
-                "node_name": 'zed_node',
+                "node_name": "zed_node",
                 "config_common_path": os.path.join(
                     get_package_share_directory("zed_wrapper"), "config", "common.yaml"
                 ),
@@ -390,12 +395,16 @@ def generate_launch_description():
     ld.add_action(ntrip_mountpoint_arg)
     ntrip_username = LaunchConfiguration("ntrip_username")
     ntrip_username_arg = DeclareLaunchArgument(
-        name="ntrip_username", description="Set username of NTRIP server", default_value=os.getenv("NTRIP_USERNAME")
+        name="ntrip_username",
+        description="Set username of NTRIP server",
+        default_value=os.getenv("NTRIP_USERNAME"),
     )
     ld.add_action(ntrip_username_arg)
     ntrip_password = LaunchConfiguration("ntrip_password")
     ntrip_password_arg = DeclareLaunchArgument(
-        name="ntrip_password", description="Set password of NTRIP server", default_value=os.getenv("NTRIP_PASSWORD")
+        name="ntrip_password",
+        description="Set password of NTRIP server",
+        default_value=os.getenv("NTRIP_PASSWORD"),
     )
     ld.add_action(ntrip_password_arg)
     # Launch NTRIP Client
@@ -424,18 +433,18 @@ def generate_launch_description():
     )
     ld.add_action(segway_toggle_arg)
     # Launch Segway RMP ROS Wrapper
-    #ld.add_action(
+    # ld.add_action(
     #    Node(
     #        package="segwayrmp",
     #        executable="SmartCar",
     #        condition=IfCondition(segway_toggle),
     #    )
-    #)
+    # )
     ld.add_action(
         ExecuteProcess(
             cmd=[
                 [
-                    FindExecutable(name='ros2'),
+                    FindExecutable(name="ros2"),
                     " service call ",
                     "/set_chassis_enable ",
                     "segway_msgs/srv/RosSetChassisEnableCmd ",
@@ -446,6 +455,5 @@ def generate_launch_description():
             condition=IfCondition(segway_toggle),
         )
     )
-
 
     return ld
