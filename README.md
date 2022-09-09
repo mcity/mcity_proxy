@@ -65,3 +65,10 @@ Add the following to `~/.bash_environment`, inserting the correct values
 export NTRIP_USERNAME=""
 export NTRIP_PASSWORD=""
 ```
+
+
+## Wifi
+
+* [Download this repo](https://github.com/RinCat/RTL88x2BU-Linux-Driver)
+* `sudo make && sudo make install`
+* Follow the instructions in the README to permanently enable USB 3.0 mode (most be plugged into 3.0 capable port!)
