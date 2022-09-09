@@ -20,29 +20,48 @@ For Mcity's autonomous proxies, we will use the convention of starting at `ROS_D
 
 ## Bash Environment
 
+Add the following to `~/.bashrc`
+
 ```
-if [[ -z "$CONTAINER_NAME" ]]; then
-    # We're not in a container
-    source /usr/share/colcon_cd/function/colcon_cd.sh
-    export _colcon_cd_root=/opt/ros/foxy
-    source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
-    export CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH:/usr/local/zed"
-    export ZED_DIR="/usr/local/zed/"
-    source ~/dev_ws/install/local_setup.bash
-    source /opt/ros/foxy/setup.bash
-else
-    # We're in a container
-    source /usr/share/colcon_cd/function/colcon_cd.sh
-    export _colcon_cd_root=/opt/ros/foxy
-    source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
-    #export CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH:/usr/local/zed"
-    #export ZED_DIR="/usr/local/zed/"
-    source /docker_ws/install/local_setup.bash
+# Make a .bash_environment file to store machine specific, secret, and temporary variables
+if [ -f "$HOME/.bash_environment" ]; then
+	source $HOME/.bash_environment
+fi
+# Make a .container_environment file and place it in the root of a container to load container specific environment
+if [ -f "/.container_environment" ]; then
+	source /.container_environment
 fi
 
-export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/dev_ws/src/mcity_proxy/models
-export PATH=$PATH:/home/luckierdodge/.local/bin
-export ROS_DOMAIN_ID=60
-export NTRIP_USERNAME="PUT THE NTRIP USERNAME HERE"
-export NTRIP_PASSWORD="PUT THE NTRIP PASSWORD HERE"
+# Machine Specific Settings and Environment Config
+case "$HOSTNAME" in
+	mcity-proxy-platform-* | mcity-proxy-basestation-*)
+		if [ -f /usr/share/colcon_cd/function/colcon_cd.sh ]; then
+			source /usr/share/colcon_cd/function/colcon_cd.sh
+			export _colcon_cd_root=/opt/ros/foxy
+		fi
+		if [ -f /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash ]; then
+			source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash
+		fi
+		export CMAKE_PREFIX_PATH="$CMAKE_PREFIX_PATH:/usr/local/zed"
+		export ZED_DIR="/usr/local/zed/"
+		for file in /opt/ros/foxy/setup.bash ~/local_ws/install/local_setup.bash ~/dev_ws/install/local_setup.bash; do
+			if [ -f "$file" ]; then
+				source $file
+			fi
+		done
+		export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/dev_ws/src/mcity_proxy/models
+		export PATH=$PATH:/home/luckierdodge/.local/bin
+		export ROS_DOMAIN_ID=60
+		;;
+	*)
+		:
+		;;
+esac
+```
+
+Add the following to `~/.bash_environment`, inserting the correct values
+
+```
+export NTRIP_USERNAME=""
+export NTRIP_PASSWORD=""
 ```
