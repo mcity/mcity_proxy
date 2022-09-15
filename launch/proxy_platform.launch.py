@@ -421,6 +421,7 @@ def generate_launch_description():
                 "password": ntrip_password,
                 "rtcm_message_package": "rtcm_msgs",
             }.items(),
+            remappings=[("/rtcm", "/ntrip_client/rtcm")],
             condition=IfCondition(ntrip_toggle),
         )
     )
