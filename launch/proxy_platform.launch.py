@@ -440,13 +440,13 @@ def generate_launch_description():
     ld.add_action(segway_toggle_arg)
     ld.add_action(segway_enable_arg)
     # Launch Segway RMP ROS Wrapper
-    # ld.add_action(
-    #    Node(
-    #        package="segwayrmp",
-    #        executable="SmartCar",
-    #        condition=IfCondition(segway_toggle),
-    #    )
-    # )
+    ld.add_action(
+       Node(
+           package="segwayrmp",
+           executable="SmartCar",
+           condition=IfCondition(segway_toggle),
+       )
+    )
     ld.add_action(
         ExecuteProcess(
             cmd=[
