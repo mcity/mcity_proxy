@@ -78,7 +78,7 @@ def generate_launch_description():
     rviz_toggle = LaunchConfiguration("rviz_toggle")
     rviz_toggle_arg = DeclareLaunchArgument(
         name="rviz_toggle",
-        default_value="True",
+        default_value="False",
         description="Flag to enable rviz",
     )
     ld.add_action(rviz_toggle_arg)
@@ -252,7 +252,7 @@ def generate_launch_description():
     steering_toggle = LaunchConfiguration("steering_toggle")
     steering_toggle_arg = DeclareLaunchArgument(
         name="steering_toggle",
-        default_value="True",
+        default_value="False",
         description="Determines whether or not to start the rqt_robot_steering node.",
     )
     ld.add_action(steering_toggle_arg)
@@ -368,7 +368,7 @@ def generate_launch_description():
     ntrip_toggle = LaunchConfiguration("ntrip_toggle")
     ntrip_toggle_arg = DeclareLaunchArgument(
         name="ntrip_toggle",
-        default_value="True",
+        default_value="False",
         description="Determines whether or not to start the NTRIP Client for RTCM correction data.",
     )
     ld.add_action(ntrip_toggle_arg)
@@ -431,7 +431,14 @@ def generate_launch_description():
         default_value="True",
         description="Determines whether or not to start the Segway RMP ROS wrapper.",
     )
+    segway_enable = LaunchConfiguration("segway_enable")
+    segway_enable_arg = DeclareLaunchArgument(
+        name="segway_enable",
+        default_value="False",
+        description="Determines whether or not to enable the Segway RMP."
+    )
     ld.add_action(segway_toggle_arg)
+    ld.add_action(segway_enable_arg)
     # Launch Segway RMP ROS Wrapper
     # ld.add_action(
     #    Node(
@@ -452,7 +459,7 @@ def generate_launch_description():
                 ]
             ],
             shell=True,
-            condition=IfCondition(segway_toggle),
+            condition=IfCondition(segway_enable),
         )
     )
 
