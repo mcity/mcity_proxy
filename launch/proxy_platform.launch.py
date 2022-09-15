@@ -419,6 +419,7 @@ def generate_launch_description():
                 "mountpoint": ntrip_mountpoint,
                 "username": ntrip_username,
                 "password": ntrip_password,
+                "rtcm_message_package": "rtcm_msgs",
             }.items(),
             condition=IfCondition(ntrip_toggle),
         )
