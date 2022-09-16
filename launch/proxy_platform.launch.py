@@ -364,7 +364,7 @@ def generate_launch_description():
             condition=IfCondition(ublox_toggle),
         )
     )
-    ntrip_launch_dir = FindPackageShare(package="ntrip_client").find("ntrip_client")
+
     ntrip_toggle = LaunchConfiguration("ntrip_toggle")
     ntrip_toggle_arg = DeclareLaunchArgument(
         name="ntrip_toggle",
@@ -411,7 +411,7 @@ def generate_launch_description():
     ld.add_action(
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(
-                os.path.join(ntrip_launch_dir, "ntrip_client_launch.py")
+                os.path.join(pkg_share, "ntrip_client.launch.py")
             ),
             launch_arguments={
                 "host": ntrip_host,
@@ -421,7 +421,6 @@ def generate_launch_description():
                 "password": ntrip_password,
                 "rtcm_message_package": "rtcm_msgs",
             }.items(),
-            remappings=[("/rtcm", "/ntrip_client/rtcm")],
             condition=IfCondition(ntrip_toggle),
         )
     )
