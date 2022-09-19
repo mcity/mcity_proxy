@@ -52,6 +52,8 @@ case "$HOSTNAME" in
 		export GAZEBO_MODEL_PATH=$GAZEBO_MODEL_PATH:$HOME/dev_ws/src/mcity_proxy/models
 		export PATH=$PATH:/home/luckierdodge/.local/bin
 		export ROS_DOMAIN_ID=60
+		export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+		export CYCLONEDDS_URI=file://$HOME/dev_ws/src/mcity_proxy/config/cyclonedds.xml
 		;;
 	*)
 		:
@@ -72,3 +74,12 @@ export NTRIP_PASSWORD=""
 * [Download this repo](https://github.com/RinCat/RTL88x2BU-Linux-Driver)
 * `sudo make && sudo make install`
 * Follow the instructions in the README to permanently enable USB 3.0 mode (most be plugged into 3.0 capable port!)
+
+
+## DDS and Networking Shenanigans
+
+```
+sudo sysctl net.ipv4.ipfrag_time=3
+sudo sysctl net.ipv4.ipfrag_high_thresh=134217728     # (128 MB)
+sudo apt install ros-rolling-rmw-cyclonedds-cpp
+``
