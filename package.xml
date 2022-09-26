@@ -16,6 +16,7 @@
   <build_depend>segwayrmp</build_depend>
   <build_depend>ublox</build_depend>
   <build_depend>ntrip_client</build_depend>
+  <build_depend>mcity_proxy_msgs</build_depend>
 
   <exec_depend>ros2launch</exec_depend>
   <exec_depend>joint_state_publisher</exec_depend>
@@ -27,6 +28,7 @@
   <exec_depend>robot_localization</exec_depend>
   <exec_depend>navigation2</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
+  <exec_depend>mcity_proxy_msgs</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>
