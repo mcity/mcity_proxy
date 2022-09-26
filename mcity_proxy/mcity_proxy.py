@@ -55,11 +55,11 @@ class Linear_Controller(Node):
     def __init__(self):
         super().__init__("linear_controller")
         self.publisher_ = self.create_publisher(Twist, "cmd_vel", 10)
-        self.lv_time_subscriber_ = self.create_subscription(
-            LinearVelocityFromTime, "topic", self.lv_time_callback, 10
+        self.lv_time_subscriber_ = self.create_service(
+            LinearVelocityFromTime, "LinearVelocityFromTime", self.lv_time_callback, 10
         )
-        self.lv_distance_subscriber_ = self.create_subscription(
-            LinearVelocityFromDistance, "topic", self.lv_distance_callback, 10
+        self.lv_distance_subscriber_ = self.create_service(
+            LinearVelocityFromDistance, "LinearVelocityFromDistance", self.lv_distance_callback, 10
         )
         self.odom_subscriber_ = self.create_subscription(
             Odometry, "/odometry/filtered", self.odom_callback, 10
