@@ -2,8 +2,12 @@ import rclpy
 from rclpy.node import Node
 
 from std_msgs.msg import String
+from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
+from mcity_proxy_msgs.srv import LinearVelocityFromTime, LinearVelocityFromDistance
 
+import time
+import math
 
 class Cmd_Vel_Spin(Node):
     """
@@ -25,6 +29,55 @@ class Cmd_Vel_Spin(Node):
     def timer_callback(self):
         msg = Twist()
         self.publisher_.publish(msg)
+
+class Linear_Controller(Node):
+    """
+    Listens for service calls of the form LinearVelocityXXX.srv, and executes drive maneuvers accordingly
+    """
+
+    def __init__(self):
+        super().__init__("linear_controller")
+        self.publisher_ = self.create_publisher(Twist, "cmd_vel", 10)
+        self.lv_time_subscriber_ = self.create_subscription(
+            LinearVelocityFromTime, "topic", self.lv_time_callback, 10
+        )
+        self.lv_distance_subscriber_ = self.create_subscription(
+            LinearVelocityFromDistance, "topic", self.lv_distance_callback, 10
+        )
+        self.odom_subscriber_ = self.create_subscription(
+            Odometry, "/odometry/filtered", self.odom_callback, 10
+        )
+        self.latest_odom = Odometry()
+
+    def lv_time_callback(self, request, response):
+        twist = Twist()
+        twist.linear.x = float(request.meters_per_second)
+        time = time.time()
+
+        while(time < time + float(request.seconds)):
+            self.publisher_.publish(twist)
+            time -= 1
+        twist.linear.x = 0.0
+        self.publisher_.publish(twist)
+        response = True
+        return response
+
+    def lv_distance_callback(self, request, response):
+        twist = Twist()
+        twist.linear.x = float(request.meters_per_second)
+        first_odom = self.latest_odom
+        while(self.distance(self.latest_odom, first_odom) < float(request.meters)):
+            self.publisher_.publish(twist)
+        twist.linear.x = 0.0
+        self.publisher_.publish(twist)
+        response = True
+        return response
+
+    def odometry_callback(self, msg):
+        self.latest_odom = msg
+
+    def distance(odom1, odom2):
+        return math.sqrt((odom1.pose.pose.position.x - odom2.pose.pose.position.x)**2 + (odom1.pose.pose.position.y - odom2.pose.pose.position.y)**2)
 
 
 def main(args=None):
