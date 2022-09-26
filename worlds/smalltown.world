@@ -1257,7 +1257,7 @@
       <model name='prius_hybrid'>
         <pose frame=''>1.05252 24.4802 0.011641 -2e-06 0 0.003052</pose>
         <scale>1 1 1</scale>
-        <link name='chassis'>
+        <link name='base_link'>
           <pose frame=''>1.05252 24.4802 0.011641 -2e-06 0 0.003052</pose>
           <velocity>8e-06 9e-06 2.1e-05 -3e-06 -0 5e-06</velocity>
           <acceleration>-0 -0 -0 0 -0 0</acceleration>
@@ -1326,7 +1326,7 @@
     </state>
     <model name='prius_hybrid'>
       <pose frame=''>1.0474 24.4712 0.03 0 -0 0</pose>
-      <link name='chassis'>
+      <link name='base_link'>
         <inertial>
           <mass>1326</mass>
           <pose frame=''>0 -0.266 0.48 0 -0 0</pose>
@@ -1339,7 +1339,7 @@
             <izz>2681.95</izz>
           </inertia>
         </inertial>
-        <visual name='chassis_visual'>
+        <visual name='base_link_visual'>
           <geometry>
             <mesh>
               <uri>model://prius_hybrid/meshes/Hybrid.obj</uri>
@@ -1375,7 +1375,7 @@
             </mesh>
           </geometry>
         </visual>
-        <collision name='chassis'>
+        <collision name='base_link'>
           <pose frame=''>0 0.05 0.625 0 -0 0</pose>
           <geometry>
             <box>
@@ -1861,7 +1861,7 @@
       <joint name='front_left_combined_joint' type='universal'>
         <pose frame=''>0 0 0 -0.087266 0 0</pose>
         <child>front_left_wheel</child>
-        <parent>chassis</parent>
+        <parent>base_link</parent>
         <axis>
           <xyz>0 0 1</xyz>
           <limit>
@@ -1887,7 +1887,7 @@
       <joint name='front_right_combined_joint' type='universal'>
         <pose frame=''>0 0 0 -0.087266 0 0</pose>
         <child>front_right_wheel</child>
-        <parent>chassis</parent>
+        <parent>base_link</parent>
         <axis>
           <xyz>0 0 1</xyz>
           <limit>
@@ -1944,7 +1944,7 @@
       </link>
       <joint name='rear_axle_joint' type='revolute'>
         <child>rear_axle</child>
-        <parent>chassis</parent>
+        <parent>base_link</parent>
         <axis>
           <xyz>0 1 0</xyz>
           <limit>
@@ -1995,7 +1995,7 @@
       </joint>
       <joint name='steering_joint' type='revolute'>
         <pose frame=''>-0.002 0 0 0 -0 0</pose>
-        <parent>chassis</parent>
+        <parent>base_link</parent>
         <child>steering_wheel</child>
         <axis>
           <xyz>0 0.964095 0.265556</xyz>
@@ -4017,8 +4017,8 @@
       </link>
       <pose frame=''>3.65333 3.73402 0 0 -0 1.5691</pose>
     </model>
-    
-    <!-- Define the lighting of the world -->    
+
+    <!-- Define the lighting of the world -->
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
       <pose frame=''>0 0 10 0 -0 0</pose>
@@ -4033,7 +4033,7 @@
       <direction>-0.5 0.1 -0.9</direction>
     </light>
 
-    <!-- Define the physics of the world -->    
+    <!-- Define the physics of the world -->
     <gravity>0 0 -9.8</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
     <atmosphere type='adiabatic'/>
@@ -4072,7 +4072,7 @@
         <projection_type>perspective</projection_type>
       </camera>
     </gui>
-    
+
     <!-- Import our own robot -->
     <include>
       <!-- Set the location where we want to spawn the robot -->

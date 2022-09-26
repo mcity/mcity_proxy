@@ -38,6 +38,87 @@ def generate_launch_description():
             package="mcity_proxy",
             executable="mcity_proxy",
             condition=IfCondition(mcity_proxy_toggle),
+            parameters=[{"timeout_period": 0.1}],
+        )
+    )
+
+    # * UBLOX RTK GNSS *
+    ublox_dir = FindPackageShare(package="ublox_gps").find("ublox_gps")
+    ublox_launch_dir = os.path.join(ublox_dir, "launch")
+    ublox_toggle = LaunchConfiguration("ublox_toggle")
+    ublox_toggle_arg = DeclareLaunchArgument(
+        name="ublox_toggle",
+        default_value="True",
+        description="Determines whether or not to start the Ublox ROS wrapper.",
+    )
+    ld.add_action(ublox_toggle_arg)
+    # Launch Ublox ROS Wrapper
+    ld.add_action(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(ublox_launch_dir, "ublox_gps_node-launch.py")
+            ),
+            condition=IfCondition(ublox_toggle),
+        )
+    )
+
+    ntrip_toggle = LaunchConfiguration("ntrip_toggle")
+    ntrip_toggle_arg = DeclareLaunchArgument(
+        name="ntrip_toggle",
+        default_value="False",
+        description="Determines whether or not to start the NTRIP Client for RTCM correction data.",
+    )
+    ld.add_action(ntrip_toggle_arg)
+    ntrip_host = LaunchConfiguration("ntrip_host")
+    ntrip_host_arg = DeclareLaunchArgument(
+        name="ntrip_host",
+        default_value="141.211.25.177",
+        description="Set hostname/ip address of NTRIP server",
+    )
+    ld.add_action(ntrip_host_arg)
+    ntrip_port = LaunchConfiguration("ntrip_port")
+    ntrip_port_arg = DeclareLaunchArgument(
+        name="ntrip_port",
+        default_value="2102",
+        description="Set port number of NTRIP server",
+    )
+    ld.add_action(ntrip_port_arg)
+    ntrip_mountpoint = LaunchConfiguration("ntrip_mountpoint")
+    ntrip_mountpoint_arg = DeclareLaunchArgument(
+        name="ntrip_mountpoint",
+        default_value="MTF",
+        description="Set mountpoint of NTRIP server",
+    )
+    ld.add_action(ntrip_mountpoint_arg)
+    ntrip_username = LaunchConfiguration("ntrip_username")
+    ntrip_username_arg = DeclareLaunchArgument(
+        name="ntrip_username",
+        description="Set username of NTRIP server",
+        default_value=os.getenv("NTRIP_USERNAME"),
+    )
+    ld.add_action(ntrip_username_arg)
+    ntrip_password = LaunchConfiguration("ntrip_password")
+    ntrip_password_arg = DeclareLaunchArgument(
+        name="ntrip_password",
+        description="Set password of NTRIP server",
+        default_value=os.getenv("NTRIP_PASSWORD"),
+    )
+    ld.add_action(ntrip_password_arg)
+    # Launch NTRIP Client
+    ld.add_action(
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_share, "ntrip_client.launch.py")
+            ),
+            launch_arguments={
+                "host": ntrip_host,
+                "port": ntrip_port,
+                "mountpoint": ntrip_mountpoint,
+                "username": ntrip_username,
+                "password": ntrip_password,
+                "rtcm_message_package": "rtcm_msgs",
+            }.items(),
+            condition=IfCondition(ntrip_toggle),
         )
     )
 
@@ -58,6 +139,7 @@ def generate_launch_description():
                     "zero_altitude": True,
                 }
             ],
+            condition=IfCondition(ublox_toggle)
         )
     )
     # Start robot localization using an Extended Kalman filter
@@ -345,85 +427,6 @@ def generate_launch_description():
         )
     )
 
-    # * UBLOX RTK GNSS *
-    ublox_dir = FindPackageShare(package="ublox_gps").find("ublox_gps")
-    ublox_launch_dir = os.path.join(ublox_dir, "launch")
-    ublox_toggle = LaunchConfiguration("ublox_toggle")
-    ublox_toggle_arg = DeclareLaunchArgument(
-        name="ublox_toggle",
-        default_value="True",
-        description="Determines whether or not to start the Ublox ROS wrapper.",
-    )
-    ld.add_action(ublox_toggle_arg)
-    # Launch Ublox ROS Wrapper
-    ld.add_action(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(ublox_launch_dir, "ublox_gps_node-launch.py")
-            ),
-            condition=IfCondition(ublox_toggle),
-        )
-    )
-
-    ntrip_toggle = LaunchConfiguration("ntrip_toggle")
-    ntrip_toggle_arg = DeclareLaunchArgument(
-        name="ntrip_toggle",
-        default_value="False",
-        description="Determines whether or not to start the NTRIP Client for RTCM correction data.",
-    )
-    ld.add_action(ntrip_toggle_arg)
-    ntrip_host = LaunchConfiguration("ntrip_host")
-    ntrip_host_arg = DeclareLaunchArgument(
-        name="ntrip_host",
-        default_value="141.211.25.177",
-        description="Set hostname/ip address of NTRIP server",
-    )
-    ld.add_action(ntrip_host_arg)
-    ntrip_port = LaunchConfiguration("ntrip_port")
-    ntrip_port_arg = DeclareLaunchArgument(
-        name="ntrip_port",
-        default_value="2102",
-        description="Set port number of NTRIP server",
-    )
-    ld.add_action(ntrip_port_arg)
-    ntrip_mountpoint = LaunchConfiguration("ntrip_mountpoint")
-    ntrip_mountpoint_arg = DeclareLaunchArgument(
-        name="ntrip_mountpoint",
-        default_value="MTF",
-        description="Set mountpoint of NTRIP server",
-    )
-    ld.add_action(ntrip_mountpoint_arg)
-    ntrip_username = LaunchConfiguration("ntrip_username")
-    ntrip_username_arg = DeclareLaunchArgument(
-        name="ntrip_username",
-        description="Set username of NTRIP server",
-        default_value=os.getenv("NTRIP_USERNAME"),
-    )
-    ld.add_action(ntrip_username_arg)
-    ntrip_password = LaunchConfiguration("ntrip_password")
-    ntrip_password_arg = DeclareLaunchArgument(
-        name="ntrip_password",
-        description="Set password of NTRIP server",
-        default_value=os.getenv("NTRIP_PASSWORD"),
-    )
-    ld.add_action(ntrip_password_arg)
-    # Launch NTRIP Client
-    ld.add_action(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_share, "ntrip_client.launch.py")
-            ),
-            launch_arguments={
-                "host": ntrip_host,
-                "port": ntrip_port,
-                "mountpoint": ntrip_mountpoint,
-                "username": ntrip_username,
-                "password": ntrip_password,
-                "rtcm_message_package": "rtcm_msgs",
-            }.items(),
-            condition=IfCondition(ntrip_toggle),
-        )
-    )
 
     # * Segway RMP *
     segway_toggle = LaunchConfiguration("segway_toggle")
@@ -436,17 +439,17 @@ def generate_launch_description():
     segway_enable_arg = DeclareLaunchArgument(
         name="segway_enable",
         default_value="False",
-        description="Determines whether or not to enable the Segway RMP."
+        description="Determines whether or not to enable the Segway RMP.",
     )
     ld.add_action(segway_toggle_arg)
     ld.add_action(segway_enable_arg)
     # Launch Segway RMP ROS Wrapper
     ld.add_action(
-       Node(
-           package="segwayrmp",
-           executable="SmartCar",
-           condition=IfCondition(segway_toggle),
-       )
+        Node(
+            package="segwayrmp",
+            executable="SmartCar",
+            condition=IfCondition(segway_toggle),
+        )
     )
     ld.add_action(
         ExecuteProcess(

@@ -66,7 +66,7 @@ Visualization Manager:
         All Enabled: true
         base_footprint:
           Value: true
-        base_link:
+        base_footprint:
           Value: true
         drivewhl_l_link:
           Value: true
@@ -93,7 +93,7 @@ Visualization Manager:
         map:
           odom:
             base_footprint:
-              base_link:
+              base_footprint:
                 drivewhl_l_link:
                   {}
                 drivewhl_r_link:
@@ -309,7 +309,7 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        base_link:
+        base_footprint:
           Alpha: 1
           Show Axes: false
           Show Trail: false

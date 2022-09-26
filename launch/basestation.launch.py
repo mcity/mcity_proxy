@@ -7,7 +7,12 @@ from launch.actions import (
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration, PythonExpression, FindExecutable
+from launch.substitutions import (
+    Command,
+    LaunchConfiguration,
+    PythonExpression,
+    FindExecutable,
+)
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
@@ -19,7 +24,7 @@ def generate_launch_description():
     package_name = "mcity_proxy"
     pkg_share = FindPackageShare(package=package_name).find(package_name)
 
-   # * RVIZ *
+    # * RVIZ *
     rviz_config_file_path = "rviz/nav2_config.rviz"
     default_rviz_config_path = os.path.join(pkg_share, rviz_config_file_path)
     # RVIZ Toggle
@@ -131,7 +136,7 @@ def generate_launch_description():
     segway_enable_arg = DeclareLaunchArgument(
         name="segway_enable",
         default_value="False",
-        description="Determines whether or not to enable the Segway RMP."
+        description="Determines whether or not to enable the Segway RMP.",
     )
     ld.add_action(segway_enable_arg)
     ld.add_action(
