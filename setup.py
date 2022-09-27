@@ -29,6 +29,9 @@ setup(
     license="MIT License",
     tests_require=["pytest"],
     entry_points={
-        "console_scripts": ["mcity_proxy = mcity_proxy.mcity_proxy:main"],
+        "console_scripts": [
+            "cmd_vel_spin = mcity_proxy.cmd_vel_spin:main",
+            "linear_velocity_open_loop_controller = mcity_proxy.linear_velocity_open_loop_controller:main",
+        ],
     },
 )

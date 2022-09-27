@@ -36,9 +36,16 @@ def generate_launch_description():
     ld.add_action(
         Node(
             package="mcity_proxy",
-            executable="mcity_proxy",
+            executable="cmd_vel_spin",
             condition=IfCondition(mcity_proxy_toggle),
             parameters=[{"timeout_period": 0.1}],
+        )
+    )
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
+            executable="linear_velocity_open_loop_controller",
+            condition=IfCondition(mcity_proxy_toggle),
         )
     )
 
@@ -139,7 +146,7 @@ def generate_launch_description():
                     "zero_altitude": True,
                 }
             ],
-            condition=IfCondition(ublox_toggle)
+            condition=IfCondition(ublox_toggle),
         )
     )
     # Start robot localization using an Extended Kalman filter
@@ -426,7 +433,6 @@ def generate_launch_description():
             ],
         )
     )
-
 
     # * Segway RMP *
     segway_toggle = LaunchConfiguration("segway_toggle")
