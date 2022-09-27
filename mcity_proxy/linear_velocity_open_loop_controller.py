@@ -34,14 +34,15 @@ class LinearVelocityOpenLoopController(Node):
     def lv_time_callback(self, request, response):
         twist = Twist()
         twist.linear.x = float(request.meters_per_second)
-        time = time.time()
+        start_time = time.time()
+        stopwatch = start_time
 
-        while time < time + float(request.seconds):
+        while stopwatch < start_time + float(request.seconds):
             self.publisher_.publish(twist)
-            time -= 1
+            stopwatch = time.time()
         twist.linear.x = 0.0
         self.publisher_.publish(twist)
-        response = True
+        response.success = True
         return response
 
     def lv_distance_callback(self, request, response):
@@ -52,7 +53,7 @@ class LinearVelocityOpenLoopController(Node):
             self.publisher_.publish(twist)
         twist.linear.x = 0.0
         self.publisher_.publish(twist)
-        response = True
+        response.success = True
         return response
 
     def odom_callback(self, msg):
