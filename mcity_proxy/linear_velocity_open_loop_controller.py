@@ -49,6 +49,8 @@ class LinearVelocityOpenLoopController(Node):
         twist = Twist()
         twist.linear.x = float(request.meters_per_second)
         first_odom = self.latest_odom
+        print(first_odom)
+        print(request.meters)
         while self.distance(self.latest_odom, first_odom) < float(request.meters):
             self.publisher_.publish(twist)
         twist.linear.x = 0.0
@@ -61,9 +63,10 @@ class LinearVelocityOpenLoopController(Node):
 
     def distance(self, odom1, odom2):
         dist = math.sqrt(
-            (odom1.pose.pose.position.x - odom2.pose.pose.position.x) ** 2
-            + (odom1.pose.pose.position.y - odom2.pose.pose.position.y) ** 2
+            (float(odom1.pose.pose.position.x) - float(odom2.pose.pose.position.x)) ** 2
+            + (float(odom1.pose.pose.position.y) - float(odom2.pose.pose.position.y)) ** 2
         )
+        print(dist)
         return dist
 
 
