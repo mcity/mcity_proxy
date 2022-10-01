@@ -27,7 +27,7 @@ class LinearVelocityOpenLoopController(Node):
             self.lv_distance_callback,
         )
         self.odom_subscriber_ = self.create_subscription(
-            Odometry, "/odometry/filtered", self.odom_callback, 10
+            Odometry, "/odometry/wheel", self.odom_callback, 10
         )
         self.latest_odom = Odometry()
 
@@ -59,11 +59,12 @@ class LinearVelocityOpenLoopController(Node):
     def odom_callback(self, msg):
         self.latest_odom = msg
 
-    def distance(odom1, odom2):
-        return math.sqrt(
+    def distance(self, odom1, odom2):
+        dist = math.sqrt(
             (odom1.pose.pose.position.x - odom2.pose.pose.position.x) ** 2
             + (odom1.pose.pose.position.y - odom2.pose.pose.position.y) ** 2
         )
+        return dist
 
 
 def main(args=None):
