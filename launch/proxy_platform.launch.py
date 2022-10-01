@@ -454,6 +454,7 @@ def generate_launch_description():
         Node(
             package="segwayrmp",
             executable="SmartCar",
+            remappings=[("/odom", "/odometry/wheel")],
             condition=IfCondition(segway_toggle),
         )
     )
