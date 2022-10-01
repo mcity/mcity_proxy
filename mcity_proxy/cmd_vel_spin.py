@@ -32,6 +32,10 @@ class Cmd_Vel_Spin(Node):
         self.timer.reset()
 
     def timer_callback(self):
+        if self.last_linear.x <= 0.1:
+            self.last_linear.x == 0
+        if self.last_linear.y <= 0.1:
+            self.last_linear.y == 0
         msg = Twist(
             linear=Vector3(
                 x=self.last_linear.x * 0.95,

@@ -43,7 +43,7 @@ class LinearVelocityOpenLoopController(Node):
         while stopwatch < start_time + float(request.seconds):
             self.publisher_.publish(twist)
             stopwatch = time.time()
-        twist.linear.x = 0.0
+        twist = Twist()
         self.publisher_.publish(twist)
         response.success = True
         return response
@@ -57,7 +57,7 @@ class LinearVelocityOpenLoopController(Node):
             (self.start_x, self.start_y), (self.latest_x, self.latest_y)
         ) < float(request.meters):
             self.publisher_.publish(twist)
-        twist.linear.x = 0.0
+        twist = Twist()
         self.publisher_.publish(twist)
         response.success = True
         return response
