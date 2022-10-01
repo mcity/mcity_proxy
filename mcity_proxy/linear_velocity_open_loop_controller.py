@@ -62,12 +62,10 @@ class LinearVelocityOpenLoopController(Node):
         self.latest_odom = msg
 
     def distance(self, odom1, odom2):
-        dist = math.sqrt(
-            (float(odom1.pose.pose.position.x) - float(odom2.pose.pose.position.x)) ** 2
-            + (float(odom1.pose.pose.position.y) - float(odom2.pose.pose.position.y)) ** 2
+        return math.dist(
+            (float(odom1.pose.pose.position.x), float(odom1.pose.pose.position.y)),
+            (float(odom2.pose.pose.position.x), float(odom2.pose.pose.position.y)),
         )
-        self.get_logger().info(f'Distance: {dist}')
-        return dist
 
 
 def main(args=None):
