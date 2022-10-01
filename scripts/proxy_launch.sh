@@ -1,3 +1,4 @@
+#!/bin/bash
 # Bootstrap script for the proxy platform
 sudo -l
 #fastdds discovery -i 0 &
