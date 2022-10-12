@@ -44,6 +44,13 @@ def generate_launch_description():
     ld.add_action(
         Node(
             package="mcity_proxy",
+            executable="move_distance_action_server",
+            condition=IfCondition(mcity_proxy_toggle),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
             executable="linear_velocity_open_loop_controller",
             condition=IfCondition(mcity_proxy_toggle),
         )

@@ -32,6 +32,7 @@ setup(
         "console_scripts": [
             "cmd_vel_spin = mcity_proxy.cmd_vel_spin:main",
             "linear_velocity_open_loop_controller = mcity_proxy.linear_velocity_open_loop_controller:main",
+            "move_distance_action_server = mcity_proxy.move_distance_action_server:main",
         ],
     },
 )

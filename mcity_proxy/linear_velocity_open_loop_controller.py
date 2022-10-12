@@ -62,6 +62,7 @@ class LinearVelocityOpenLoopController(Node):
         response.success = True
         return response
 
+
 class OdomUpdater(Node):
     """
     Updates Odometry on an instance of LinearVelocityOpenLoopController
@@ -78,11 +79,13 @@ class OdomUpdater(Node):
         self.lin_vel_olc.latest_x = copy.deepcopy(msg.pose.pose.position.x)
         self.lin_vel_olc.latest_y = copy.deepcopy(msg.pose.pose.position.y)
 
+
 def spin_odom_updater(executor):
-     try:
-          executor.spin()
-     except rclpy.executors.ExternalShutdownException:
-          pass
+    try:
+        executor.spin()
+    except rclpy.executors.ExternalShutdownException:
+        pass
+
 
 def main(args=None):
     rclpy.init(args=args)
@@ -92,7 +95,9 @@ def main(args=None):
     odom_updater = OdomUpdater(lin_vec_open_loop_control)
     odom_updater_exec = SingleThreadedExecutor()
     odom_updater_exec.add_node(odom_updater)
-    odom_updater_thread = Thread(target=spin_odom_updater, args=(odom_updater_exec, ), daemon=True)
+    odom_updater_thread = Thread(
+        target=spin_odom_updater, args=(odom_updater_exec,), daemon=True
+    )
     odom_updater_thread.start()
 
     rclpy.spin(lin_vec_open_loop_control)
