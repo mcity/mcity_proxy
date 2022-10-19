@@ -14,7 +14,10 @@
 
 ## Installation Notes
 
-`sudo pip3 install transforms3d`
+```
+sudo pip3 install transforms3d
+sudo apt install ros-foxy-tf-transformations -y
+```
 
 ## Domain IDs
 
