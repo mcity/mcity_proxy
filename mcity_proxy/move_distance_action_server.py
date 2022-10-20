@@ -19,6 +19,8 @@ from threading import Thread
 
 START_COURSE_CORRECT_THRESHOLD = 0.05
 STOP_COURSE_CORRECT_THRESHOLD = 0.01
+COURSE_CORRECTION_CUTOFF = 0.25
+ANGULAR_DEFLECTION_ABORT = np.pi / 2
 
 
 class MoveDistanceActionServer(Node):
@@ -95,23 +97,26 @@ class MoveDistanceActionServer(Node):
         start_position = np.array([start_pose.position.x, start_pose.position.y, 0.0])
         feedback_msg = MoveDistance.Feedback()
 
-        current_position = np.array([
-            self.latest_pose.position.x,
-            self.latest_pose.position.y,
-            0.0,
-        ])
+        current_position = np.array(
+            [
+                self.latest_pose.position.x,
+                self.latest_pose.position.y,
+                0.0,
+            ]
+        )
 
         while np.linalg.norm(current_position - start_position) < 0.01:
             # * Make sure we haven't been cancelled or aborted
             result = self.check_goal_state_change(goal_handle)
             if result is not None:
                 return result
-            current_position = np.array([
-                self.latest_pose.position.x,
-                self.latest_pose.position.y,
-                0.0,
-            ])
-
+            current_position = np.array(
+                [
+                    self.latest_pose.position.x,
+                    self.latest_pose.position.y,
+                    0.0,
+                ]
+            )
 
         goal_heading = current_position - start_position
         goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
@@ -129,30 +134,34 @@ class MoveDistanceActionServer(Node):
             if result is not None:
                 return result
 
-            current_position = np.array([
-                self.latest_pose.position.x,
-                self.latest_pose.position.y,
-                0.0,
-            ])
+            current_position = np.array(
+                [
+                    self.latest_pose.position.x,
+                    self.latest_pose.position.y,
+                    0.0,
+                ]
+            )
 
+            # * If we haven't yet moved far enough to establish orientation, wait before any course correction
             if np.linalg.norm(current_position - previous_position) < 0.01:
+                self.publisher_.publish(twist)
                 continue
 
             # * Figure out our current heading and the heading we want to be on
-
-
             current_heading = current_position - previous_position
-            current_heading_unit = current_heading / np.linalg.norm(current_heading) * direction
+            current_heading_unit = (
+                current_heading / np.linalg.norm(current_heading) * direction
+            )
             previous_position = current_position.copy()
-
             goal_heading = goal_position - current_position
             goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
 
-            distance_remaining = np.abs(distance) - np.linalg.norm(
-                current_position - start_position
-            )
             theta = 0.0
-            if distance_remaining > 0.5:
+            # * Stop course correction when we're within COURSE_CORRECTION_CUTOFF
+            if (
+                np.abs(distance) - np.linalg.norm(current_position - start_position)
+                > COURSE_CORRECTION_CUTOFF
+            ):
                 angular_deflection = np.arccos(
                     np.clip(
                         np.dot(goal_heading_unit, current_heading_unit),
@@ -160,7 +169,7 @@ class MoveDistanceActionServer(Node):
                         1.0,
                     )
                 )
-                if np.abs(angular_deflection) > (np.pi / 2):
+                if np.abs(angular_deflection) > ANGULAR_DEFLECTION_ABORT:
                     self.get_logger().info(
                         f"Goal aborted. Too far off course. {angular_deflection}"
                     )
@@ -178,7 +187,7 @@ class MoveDistanceActionServer(Node):
                 if np.abs(angular_deflection) > threshold:
                     if threshold == START_COURSE_CORRECT_THRESHOLD:
                         threshold = STOP_COURSE_CORRECT_THRESHOLD
-                    theta = (  # * Attenuate our angular correction by kP
+                    theta = (  # * Attenuate our corrective angular velocity by kP
                         self.kP * angular_deflection * direction
                     )
                     # * Figure out which direction to turn
