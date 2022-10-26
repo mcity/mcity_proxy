@@ -65,9 +65,12 @@ class MoveDistanceActionServer(Node):
         self.latest_orientation_w = copy.deepcopy(msg.pose.pose.orientation.w)
 
     def goal_callback(self, goal_request):
+        self.get_logger().info("MoveDistance Action Server: Received Goal")
+        # self.get_logger().info("BLAH")
         return GoalResponse.ACCEPT
 
     def handle_accepted_callback(self, goal_handle):
+        self.get_logger().info("MoveDistance Action Server: Handling Accepted Goal")
         with self._goal_lock:
             # This server only allows one goal at a time
             if self._goal_handle is not None and self._goal_handle.is_active:
@@ -78,10 +81,12 @@ class MoveDistanceActionServer(Node):
         goal_handle.execute()
 
     def cancel_callback(self, goal):
+        self.get_logger().info("MoveDistance Action Server: Cancelling Goal")
         self.get_logger().info("Received Cancel Request")
         return CancelResponse.ACCEPT
 
     def execute_callback(self, goal_handle):
+        self.get_logger().info("MoveDistance Action Server: Executing Goal")
         velocity, distance, direction = self.handle_negative_vel_and_dist(goal_handle)
 
         # * Capture our intitial state and extrapolate goal information

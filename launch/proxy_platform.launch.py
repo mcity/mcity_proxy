@@ -6,7 +6,7 @@ from launch.actions import (
     IncludeLaunchDescription,
 )
 from launch.conditions import IfCondition, UnlessCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.launch_description_sources import PythonLaunchDescriptionSource, AnyLaunchDescriptionSource
 from launch.substitutions import (
     Command,
     LaunchConfiguration,
@@ -51,8 +51,26 @@ def generate_launch_description():
     ld.add_action(
         Node(
             package="mcity_proxy",
+            executable="action_manager",
+            condition=IfCondition(mcity_proxy_toggle),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
             executable="linear_velocity_open_loop_controller",
             condition=IfCondition(mcity_proxy_toggle),
+        )
+    )
+
+    # * ROS Bridge *
+    ros_bridge_dir = FindPackageShare(package="rosbridge_server").find("rosbridge_server")
+    ros_bridge_launch_dir = os.path.join(ros_bridge_dir, "launch")
+    ld.add_action(
+        IncludeLaunchDescription(
+            AnyLaunchDescriptionSource(
+                os.path.join(ros_bridge_launch_dir, "rosbridge_websocket_launch.xml")
+            )
         )
     )
 
@@ -300,7 +318,7 @@ def generate_launch_description():
     nav_toggle = LaunchConfiguration("nav_toggle")
     nav_toggle_arg = DeclareLaunchArgument(
         name="nav_toggle",
-        default_value="true",
+        default_value="False",
         description="Toggle the nav2 stack on or off.",
     )
     ld.add_action(nav_toggle_arg)
@@ -308,7 +326,7 @@ def generate_launch_description():
     autostart_toggle = LaunchConfiguration("autostart_toggle")
     autostart_toggle_arg = DeclareLaunchArgument(
         name="autostart_toggle",
-        default_value="true",
+        default_value="False",
         description="Automatically startup the nav2 stack",
     )
     ld.add_action(autostart_toggle_arg)
@@ -366,7 +384,7 @@ def generate_launch_description():
     zed_toggle = LaunchConfiguration("zed_toggle")
     zed_toggle_arg = DeclareLaunchArgument(
         name="zed_toggle",
-        default_value="True",
+        default_value="False",
         description="Determines whether or not to start the ZED 2i ROS wrapper.",
     )
     ld.add_action(zed_toggle_arg)
@@ -451,7 +469,7 @@ def generate_launch_description():
     segway_enable = LaunchConfiguration("segway_enable")
     segway_enable_arg = DeclareLaunchArgument(
         name="segway_enable",
-        default_value="False",
+        default_value="True",
         description="Determines whether or not to enable the Segway RMP.",
     )
     ld.add_action(segway_toggle_arg)
