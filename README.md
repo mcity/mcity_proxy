@@ -90,3 +90,11 @@ sudo sysctl net.ipv4.ipfrag_time=3
 sudo sysctl net.ipv4.ipfrag_high_thresh=134217728     # (128 MB)
 #sudo apt install ros-foxy-rmw-cyclonedds-cpp
 ``
+
+## Automatic Proxy Start
+
+Run `sudo crontab -e` and add the following line:
+
+```
+@reboot /home/mcity/dev_ws/src/mcity_proxy/proxy_boot.sh
+```

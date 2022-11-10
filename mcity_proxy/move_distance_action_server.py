@@ -34,7 +34,7 @@ class MoveDistanceActionServer(Node):
         self.callback_group = ReentrantCallbackGroup()
         self.odom_subscriber_ = self.create_subscription(
             Odometry,
-            "/odometry/filtered",
+            "/odometry/wheel",
             self.odom_callback,
             10,
             callback_group=self.callback_group,

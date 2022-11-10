@@ -22,6 +22,17 @@ import copy
 from threading import Thread, Lock
 
 
+# * This entire file and the corresponding Node, Messages, Services, and dependent code
+# * is a mitigation for a problem in rclpy that affects how we can talk to our robot.
+# * In short, the bug prevents custom Action Clients like the one roslibpy implements from
+# * actually communicating with our Action Server. As a workaround, we wrap the Action Server
+# * in a services. Once this issue is resolved, we'll want to remove the middleman and call our
+# * actions directly using roslibpy.
+# * See the following:
+#       * https://github.com/RobotWebTools/rosbridge_suite/issues/697
+#       * https://github.com/RobotWebTools/rosbridge_suite/pull/804
+#       * https://github.com/ros2/ros2/issues/1333
+
 class ActionManager(Node):
     states = [
         "AWAITING_GOAL",
