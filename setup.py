@@ -34,6 +34,7 @@ setup(
             "linear_velocity_open_loop_controller = mcity_proxy.linear_velocity_open_loop_controller:main",
             "move_distance_action_server = mcity_proxy.move_distance_action_server:main",
             "action_manager = mcity_proxy.action_manager:main",
+            "proxy_control = mcity_proxy.proxy_control:main",
         ],
     },
 )

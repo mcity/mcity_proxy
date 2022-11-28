@@ -33,13 +33,14 @@ from threading import Thread, Lock
 #       * https://github.com/RobotWebTools/rosbridge_suite/pull/804
 #       * https://github.com/ros2/ros2/issues/1333
 
+
 class ActionManager(Node):
     states = [
         "AWAITING_GOAL",
         "AWAITING_RESPONSE",
         "AWAITING_RESULT",
         "CANCELLING_GOAL",
-        "HALT"
+        "HALT",
     ]
 
     def __init__(self):
@@ -127,7 +128,10 @@ class ActionManager(Node):
 
                     self._send_goal_future_move_distance = (
                         self._action_client_move_distance.send_goal_async(
-                            MoveDistance.Goal(meters_per_second=self.goal.meters_per_second, meters=self.goal.meters),
+                            MoveDistance.Goal(
+                                meters_per_second=self.goal.meters_per_second,
+                                meters=self.goal.meters,
+                            ),
                             feedback_callback=self.move_distance_feedback_callback,
                         )
                     )
@@ -139,7 +143,9 @@ class ActionManager(Node):
                     self.state = "AWAITING_RESPONSE"
 
             if self.state == "AWAITING_RESPONSE" and self._goal_handle is not None:
-                self.get_logger().info(f"Dispatcher: Recieved response from Action Server")
+                self.get_logger().info(
+                    f"Dispatcher: Recieved response from Action Server"
+                )
                 stopwatch = None
                 self.accepted = self._goal_handle.accepted
                 if self.accepted:
@@ -152,14 +158,17 @@ class ActionManager(Node):
                     )
                     self.state = "AWAITING_RESULT"
                 else:
-                    self.get_logger().info(f"Dispatcher: Goal not accepted, resetting...")
+                    self.get_logger().info(
+                        f"Dispatcher: Goal not accepted, resetting..."
+                    )
                     self.reset_state()
-
 
             if self.state == "CANCELLING_GOAL":
                 self.get_logger().info(f"Dispatcher: Cancelling...")
                 if self._goal_handle is not None:
-                    self._cancel_move_distance_goal = self._goal_handle.cancel_goal_async()
+                    self._cancel_move_distance_goal = (
+                        self._goal_handle.cancel_goal_async()
+                    )
                     # self._cancel_move_distance_goal.add_done_callback(
                     #     self.cancel_move_distance_finished_callback
                     # )
@@ -167,9 +176,15 @@ class ActionManager(Node):
                 else:
                     self.reset_state()
 
-            if self.state == "AWAITING_RESPONSE" and self._goal_handle is None and stopwatch is not None:
+            if (
+                self.state == "AWAITING_RESPONSE"
+                and self._goal_handle is None
+                and stopwatch is not None
+            ):
                 if time.time() - stopwatch > 10:
-                    self.get_logger().info(f"Dispatcher: Timed out waiting for response from Action Server...")
+                    self.get_logger().info(
+                        f"Dispatcher: Timed out waiting for response from Action Server..."
+                    )
                     stopwatch = None
                     self.reset_state()
             continue

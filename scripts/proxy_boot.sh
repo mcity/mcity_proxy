@@ -1,6 +1,6 @@
 #!/bin/bash
 # Make sure you set NTRIP_USERNAME and NTRIP_PASSWORD in .bash_environment
-for file in /opt/ros/foxy/setup.bash /home/luckierdodge/local_ws/install/local_setup.bash /home/luckierdodge/dev_ws/install/local_setup.bash /home/luckierdodge/.bash_environment; do
+for file in /opt/ros/foxy/setup.bash /home/mcity/local_ws/install/local_setup.bash /home/mcity/dev_ws/install/local_setup.bash /home/mcity/.bash_environment; do
 	if [ -f "$file" ]; then
 		source $file
 	fi

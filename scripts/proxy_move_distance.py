@@ -16,17 +16,27 @@ client.run()
 # result = service.call(request)
 # print(f'Service response: {result}')
 
-service = roslibpy.Service(client, '/action_manager/move_distance_send_goal', 'mcity_proxy_msgs/srv/MoveDistanceSendGoal')
-request = roslibpy.ServiceRequest(values={'move_distance_goal': {'meters_per_second': -0.5, 'meters': 1}})
+service = roslibpy.Service(
+    client,
+    "/action_manager/move_distance_send_goal",
+    "mcity_proxy_msgs/srv/MoveDistanceSendGoal",
+)
+request = roslibpy.ServiceRequest(
+    values={"move_distance_goal": {"meters_per_second": -0.5, "meters": 1}}
+)
 
-print('Calling service...')
+print("Calling service...")
 result = service.call(request)
 print(f"Service response: {result}")
 
-service = roslibpy.Service(client, '/action_manager/move_distance_cancel_goal', 'mcity_proxy_msgs/srv/MoveDistanceCancelGoal')
+service = roslibpy.Service(
+    client,
+    "/action_manager/move_distance_cancel_goal",
+    "mcity_proxy_msgs/srv/MoveDistanceCancelGoal",
+)
 request = roslibpy.ServiceRequest(values={})
 
-print('Calling service...')
+print("Calling service...")
 result = service.call(request)
 print(f"Service response: {result}")
 

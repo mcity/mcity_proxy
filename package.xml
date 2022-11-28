@@ -31,6 +31,7 @@
   <exec_depend>mcity_proxy_msgs</exec_depend>
 
   <depend>tf_transformations</depend>
+  <depend>python3-socketio</depend>
 
   <export>
     <build_type>ament_python</build_type>
