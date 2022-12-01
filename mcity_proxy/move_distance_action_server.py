@@ -55,7 +55,6 @@ class MoveDistanceActionServer(Node):
         super().destroy_node()
 
     def odom_callback(self, msg):
-        # self.get_logger().info("ODOMETRY!")
         self.latest_pose = copy.deepcopy(msg.pose.pose)
         self.latest_pose_x = copy.deepcopy(msg.pose.pose.position.x)
         self.latest_pose_y = copy.deepcopy(msg.pose.pose.position.y)
@@ -66,7 +65,6 @@ class MoveDistanceActionServer(Node):
 
     def goal_callback(self, goal_request):
         self.get_logger().info("MoveDistance Action Server: Received Goal")
-        # self.get_logger().info("BLAH")
         return GoalResponse.ACCEPT
 
     def handle_accepted_callback(self, goal_handle):
@@ -82,7 +80,6 @@ class MoveDistanceActionServer(Node):
 
     def cancel_callback(self, goal):
         self.get_logger().info("MoveDistance Action Server: Cancelling Goal")
-        self.get_logger().info("Received Cancel Request")
         return CancelResponse.ACCEPT
 
     def execute_callback(self, goal_handle):
@@ -128,8 +125,8 @@ class MoveDistanceActionServer(Node):
         goal_position = start_position + np.dot(distance, goal_heading_unit)
         previous_position = current_position.copy()
 
-        self.get_logger().info(f"START POSITION: {start_position}")
-        self.get_logger().info(f"GOAL POSITION: {goal_position}")
+        # self.get_logger().info(f"START POSITION: {start_position}")
+        # self.get_logger().info(f"GOAL POSITION: {goal_position}")
 
         tick = time.time()
         threshold = START_COURSE_CORRECT_THRESHOLD
@@ -211,10 +208,10 @@ class MoveDistanceActionServer(Node):
                     x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
                 )
                 goal_handle.publish_feedback(feedback_msg)
-                if angular_deflection is not None:
-                    self.get_logger().info(
-                        f"{angular_deflection}, {goal_heading_unit}, {current_heading_unit}"
-                    )
+                # if angular_deflection is not None:
+                    # self.get_logger().info(
+                    #     f"{angular_deflection}, {goal_heading_unit}, {current_heading_unit}"
+                    # )
                 tick = time.time()
         # * endwhile
 

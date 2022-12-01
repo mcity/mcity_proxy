@@ -54,20 +54,6 @@ def generate_launch_description():
     ld.add_action(
         Node(
             package="mcity_proxy",
-            executable="action_manager",
-            condition=IfCondition(mcity_proxy_toggle),
-        )
-    )
-    # ld.add_action(
-    #     Node(
-    #         package="mcity_proxy",
-    #         executable="linear_velocity_open_loop_controller",
-    #         condition=IfCondition(mcity_proxy_toggle),
-    #     )
-    # )
-    ld.add_action(
-        Node(
-            package="mcity_proxy",
             executable="proxy_control",
             condition=IfCondition(mcity_proxy_toggle),
         )
@@ -481,7 +467,7 @@ def generate_launch_description():
     segway_enable = LaunchConfiguration("segway_enable")
     segway_enable_arg = DeclareLaunchArgument(
         name="segway_enable",
-        default_value="True",
+        default_value="False",
         description="Determines whether or not to enable the Segway RMP.",
     )
     ld.add_action(segway_toggle_arg)

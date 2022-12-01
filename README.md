@@ -16,6 +16,8 @@
 
 ```
 sudo usermod -aG dialout mcity
+sudo usermod -aG i2c mcity
+sudo usermod -aG gpio mcity
 ```
 
 ## Installation Notes
