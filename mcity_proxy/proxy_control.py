@@ -10,6 +10,7 @@ from mcity_proxy_msgs.action import MoveDistance
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from segway_msgs.srv import RosSetChassisEnableCmd
 from rclpy_message_converter import json_message_converter
+from sensor_msgs.msg import NavSatFix
 
 import os
 import time
@@ -20,6 +21,7 @@ import socketio
 import json
 import time
 
+
 class SocketComms(socketio.ClientNamespace):
     proxy_control = None
 
@@ -28,7 +30,7 @@ class SocketComms(socketio.ClientNamespace):
         self.id = os.environ.get("ROBOT_ID", 1)
         self.namespace = "/octane"
         self.channel = "robot_proxy"
-        self.room="robot"
+        self.room = "robot"
         super().__init__(self.namespace)
 
     def send_auth(self):
@@ -50,7 +52,7 @@ class SocketComms(socketio.ClientNamespace):
         """
         Event fired when user joins a channel
         """
-        self.proxy_control.log(f'Subscribed to: {data}')
+        self.proxy_control.log(f"Subscribed to: {data}")
 
     def on_channels(self, data: dict):
         """
@@ -59,7 +61,7 @@ class SocketComms(socketio.ClientNamespace):
         pass
 
     def on_auth_ok(self, data):
-        self.proxy_control.log(f'Authorized, joining room {self.room}')
+        self.proxy_control.log(f"Authorized, joining room {self.room}")
         self.emit("join", {"channel": self.room}, namespace=self.namespace)
 
     # def on_message(self, data):
@@ -69,16 +71,17 @@ class SocketComms(socketio.ClientNamespace):
         """
         Event fired for each message on the 'robot_proxy' channel
         """
-        self.proxy_control.log(f"Received: {data}")
         message_id = data.get("id", None)
         if str(message_id) != str(self.id):
-            self.proxy_control.log("This message isn't for me, ignoring")
+            # self.proxy_control.log("This message isn't for me, ignoring")
             return
         message_type = data.get("type", None)
         if message_type == "estop":
             # * Emergency Stop
+            self.proxy_control.log(f"Received: {data}")
             self.proxy_control.estop()
         elif message_type == "action":
+            self.proxy_control.log(f"Received: {data}")
             # * Action
             action = data.get("action", None)
             if action == "move_distance" or action == "/move_distance":
@@ -95,10 +98,12 @@ class SocketComms(socketio.ClientNamespace):
                 self.proxy_control.log("Unknown action type, returning")
                 return
         elif message_type == "service":
+            self.proxy_control.log(f"Received: {data}")
             # * Service
             self.proxy_control.log("No services currently supported, ignoring")
             return
         elif message_type == "topic":
+            self.proxy_control.log(f"Received: {data}")
             topic = data.get("topic", None)
             values = data.get("values", None)
             if topic == "cmd_vel" or topic == "/cmd_vel":
@@ -107,22 +112,30 @@ class SocketComms(socketio.ClientNamespace):
                 self.proxy_control.log("Unsupported topic, returning")
                 return
         else:
-            self.proxy_control.log("Unrecognized message type, ignoring")
+            # self.proxy_control.log("Unrecognized message type, ignoring")
             return
 
     def send_ros_message(self, type, data):
         message = {
             "id": self.id,
             "type": type,
-            "data": json_message_converter.convert_ros_message_to_json(data)
+            "data": json_message_converter.convert_ros_message_to_json(data),
         }
         self.emit(self.channel, message)
 
     def send_message(self, type, data):
+        message = {"id": self.id, "type": type, "data": json.dumps(data)}
+        self.emit(self.channel, message)
+
+    def status_update(self):
         message = {
             "id": self.id,
-            "type": type,
-            "data": json.dumps(data)
+            "type": "proxy_status",
+            "data": {
+                "navsat_fix": json_message_converter.convert_ros_message_to_json(
+                    self.proxy_control.last_navsat_fix
+                )
+            },
         }
         self.emit(self.channel, message)
 
@@ -145,13 +158,20 @@ class ProxyControl(Node):
             ros_set_chassis_enable_cmd=False
         )
 
-        # *Topics
+        # *Topic Publishers
         self.cmd_vel_pub = self.create_publisher(Twist, "cmd_vel", 10)
 
+        # *Topic Subscribers
+        self.gps_fitered_sub = self.create_subscription(
+            NavSatFix, "/gps/filtered", self.gps_filtered_callback, 10
+        )
+
+        # *Local Data Members
         self.goal_handle = None
         self.send_goal_future_move_distance = None
         self.cancel_move_distance_goal = None
         self.get_move_distance_result_future = None
+        self.last_navsat_fix = NavSatFix()
 
     def log(self, message):
         self.get_logger().info(message)
@@ -162,21 +182,24 @@ class ProxyControl(Node):
         return self.future.result()
 
     def publish_cmd_vel(self, values):
-        msg = json_message_converter.convert_json_to_ros_message('geometry_msgs/Twist', values)
+        msg = json_message_converter.convert_json_to_ros_message(
+            "geometry_msgs/Twist", values
+        )
         self.cmd_vel_pub.publish(msg)
 
+    def gps_filtered_callback(self, msg):
+        self.last_navsat_fix = msg
+        self.socket_comms.status_update()
 
     def move_distance_send_goal(self, values):
         goal = values["move_distance_goal"]
         self.ac_move_distance.wait_for_server()
-        self.send_goal_future_move_distance = (
-            self.ac_move_distance.send_goal_async(
-                MoveDistance.Goal(
-                    meters_per_second=float(goal["meters_per_second"]),
-                    meters=float(goal["meters"]),
-                ),
-                feedback_callback=self.move_distance_feedback_callback,
-            )
+        self.send_goal_future_move_distance = self.ac_move_distance.send_goal_async(
+            MoveDistance.Goal(
+                meters_per_second=float(goal["meters_per_second"]),
+                meters=float(goal["meters"]),
+            ),
+            feedback_callback=self.move_distance_feedback_callback,
         )
         self.send_goal_future_move_distance.add_done_callback(
             self.move_distance_response_callback
@@ -199,7 +222,9 @@ class ProxyControl(Node):
     def move_distance_response_callback(self, future):
         self.get_logger().info(f"Response Callback triggered")
         self.goal_handle = future.result()
-        self.socket_comms.send_message("goal_response", {"accepted": self.goal_handle.accepted})
+        self.socket_comms.send_message(
+            "goal_response", {"accepted": self.goal_handle.accepted}
+        )
 
     def move_distance_get_result_callback(self, future):
         # self.get_logger().info(f"Result Callback triggered")
@@ -218,6 +243,7 @@ def socket_io_spin(sio, socket_comms, proxy_control):
     proxy_control.log("Spinning socket client.")
     sio.wait()
 
+
 def result_spin(sio, socket_comms, proxy_control):
     while True:
         if proxy_control.goal_handle is not None:
@@ -228,7 +254,7 @@ def result_spin(sio, socket_comms, proxy_control):
                 proxy_control.get_move_distance_result_future.add_done_callback(
                     proxy_control.move_distance_get_result_callback
                 )
-        time.sleep(.1)
+        time.sleep(0.1)
 
 
 def main(args=None):
@@ -244,10 +270,14 @@ def main(args=None):
     sio.register_namespace(namespace_handler=socket_comms)
     sio.connect(server)
 
-    socket_thread = Thread(target=socket_io_spin, args=(sio, socket_comms, proxy_control), daemon=True)
+    socket_thread = Thread(
+        target=socket_io_spin, args=(sio, socket_comms, proxy_control), daemon=True
+    )
     socket_thread.start()
 
-    result_thread = Thread(target=result_spin, args=(sio, socket_comms, proxy_control), daemon=True)
+    result_thread = Thread(
+        target=result_spin, args=(sio, socket_comms, proxy_control), daemon=True
+    )
     result_thread.start()
 
     multi_exec = MultiThreadedExecutor(num_threads=8)

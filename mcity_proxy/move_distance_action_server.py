@@ -29,12 +29,13 @@ class MoveDistanceActionServer(Node):
         self.publisher_ = self.create_publisher(Twist, "cmd_vel", 10)
         self._goal_handle = None
         self._goal_lock = threading.Lock()
+        self.goal_position = np.array([0.0, 0.0, 0.0])
         self.latest_pose = None
         self.kP = 0.5
         self.callback_group = ReentrantCallbackGroup()
         self.odom_subscriber_ = self.create_subscription(
             Odometry,
-            "/odometry/wheel",
+            "/odometry/filtered",
             self.odom_callback,
             10,
             callback_group=self.callback_group,
@@ -122,7 +123,7 @@ class MoveDistanceActionServer(Node):
 
         goal_heading = current_position - start_position
         goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
-        goal_position = start_position + np.dot(distance, goal_heading_unit)
+        self.goal_position = start_position + np.dot(distance, goal_heading_unit)
         previous_position = current_position.copy()
 
         # self.get_logger().info(f"START POSITION: {start_position}")
@@ -155,7 +156,7 @@ class MoveDistanceActionServer(Node):
                 current_heading / np.linalg.norm(current_heading) * direction
             )
             previous_position = current_position.copy()
-            goal_heading = goal_position - current_position
+            goal_heading = self.goal_position - current_position
             goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
 
             theta = 0.0
@@ -207,11 +208,10 @@ class MoveDistanceActionServer(Node):
                 feedback_msg.current_position = Point(
                     x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
                 )
+                feedback_msg.goal_position = Point(
+                    x=self.goal_position[0], y=self.goal_position[1], z=0.0
+                )
                 goal_handle.publish_feedback(feedback_msg)
-                # if angular_deflection is not None:
-                    # self.get_logger().info(
-                    #     f"{angular_deflection}, {goal_heading_unit}, {current_heading_unit}"
-                    # )
                 tick = time.time()
         # * endwhile
 
@@ -223,6 +223,10 @@ class MoveDistanceActionServer(Node):
         result.final_position = Point(
             x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
         )
+        result.goal_position = Point(
+            x=self.goal_position[0], y=self.goal_position[1], z=0.0
+        )
+
         return result
 
     def handle_negative_vel_and_dist(self, goal_handle):
@@ -241,14 +245,17 @@ class MoveDistanceActionServer(Node):
     def check_goal_state_change(self, goal_handle):
         result = None
         if not goal_handle.is_active:
-            # Another goal was set: abort, and return the current position
+            # *Another goal was set: abort, and return the current position
             self.get_logger().info("Goal aborted.")
             result = MoveDistance.Result()
             result.final_position = Point(
                 x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
             )
+            result.goal_position = Point(
+                x=self.goal_position[0], y=self.goal_position[1], z=0.0
+            )
         if goal_handle.is_cancel_requested:
-            # Goal was canceled, stop the robot and return the current position
+            # *Goal was canceled, stop the robot and return the current position
             self.get_logger().info("Goal cancelled.")
             goal_handle.canceled()
             twist = Twist()
@@ -256,6 +263,9 @@ class MoveDistanceActionServer(Node):
             result = MoveDistance.Result()
             result.final_position = Point(
                 x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
+            )
+            result.goal_position = Point(
+                x=self.goal_position[0], y=self.goal_position[1], z=0.0
             )
         return result
 

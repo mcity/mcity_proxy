@@ -217,7 +217,7 @@
   <xacro:back_wheel prefix="backwhl_l" x_offset="-.24" offset_multiplier="1" z_rotate="3.14159265359"/>
 
   <!-- *********************** GPS SETUP **********************************  -->
-  <link name="gps_link">
+  <link name="gps">
     <visual>
       <geometry>
         <box size=".05 .042 .001"/>
@@ -230,10 +230,10 @@
   </link>
   <joint name="gps_joint" type="fixed">
     <parent link="base_link"/>
-    <child link="gps_link"/>
+    <child link="gps"/>
     <origin xyz="-.117 0.01 0.08" rpy="0 0 0"/>
   </joint>
-  <gazebo reference="gps_link">
+  <gazebo reference="gps">
     <material>Gazebo/Blue</material>
     <sensor name="rmp_gps" type="gps">
       <always_on>true</always_on>

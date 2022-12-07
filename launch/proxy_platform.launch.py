@@ -60,6 +60,12 @@ def generate_launch_description():
     )
 
     # * ROS Bridge *
+    rosbridge_toggle = LaunchConfiguration("rosbridge_toggle")
+    rosbridge_toggle_arg = DeclareLaunchArgument(
+        name="rosbridge_toggle",
+        default_value="True",
+        description="Determines whether or not to start ROS Bridge.",
+    )
     ros_bridge_dir = FindPackageShare(package="rosbridge_server").find(
         "rosbridge_server"
     )
@@ -95,7 +101,7 @@ def generate_launch_description():
     ntrip_toggle = LaunchConfiguration("ntrip_toggle")
     ntrip_toggle_arg = DeclareLaunchArgument(
         name="ntrip_toggle",
-        default_value="False",
+        default_value="True",
         description="Determines whether or not to start the NTRIP Client for RTCM correction data.",
     )
     ld.add_action(ntrip_toggle_arg)
@@ -161,7 +167,9 @@ def generate_launch_description():
             executable="navsat_transform_node",
             name="navsat_transform_node",
             output="screen",
-            remappings=[("/odometry/filtered", "/odometry/navsat_transformed")],
+            remappings=[
+                ("/gps/fix", "/fix"),
+            ],
             parameters=[
                 {
                     "magnetic_declination_radians": 0.0,
@@ -454,6 +462,7 @@ def generate_launch_description():
                 ("depth", "zed_2i/depth/image_raw"),
                 ("depth_camera_info", "zed_2i/depth/camera_info"),
             ],
+            condition=IfCondition(zed_toggle),
         )
     )
 
@@ -467,7 +476,7 @@ def generate_launch_description():
     segway_enable = LaunchConfiguration("segway_enable")
     segway_enable_arg = DeclareLaunchArgument(
         name="segway_enable",
-        default_value="False",
+        default_value="True",
         description="Determines whether or not to enable the Segway RMP.",
     )
     ld.add_action(segway_toggle_arg)
@@ -477,7 +486,11 @@ def generate_launch_description():
         Node(
             package="segwayrmp",
             executable="SmartCar",
-            remappings=[("/odom", "/odometry/wheel")],
+            remappings=[
+                ("/odom", "/odometry/wheel"),
+                ("/tf", "/tf_segway"),
+                ("/tf_static", "/tf_static_segway"),
+            ],
             condition=IfCondition(segway_toggle),
         )
     )
