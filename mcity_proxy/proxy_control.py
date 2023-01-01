@@ -31,6 +31,8 @@ class SocketComms(socketio.ClientNamespace):
         self.namespace = "/octane"
         self.channel = "robot_proxy"
         self.room = "robot"
+        self.scenario = None
+        self.scenario_type = None
         super().__init__(self.namespace)
 
     def send_auth(self):
@@ -64,24 +66,18 @@ class SocketComms(socketio.ClientNamespace):
         self.proxy_control.log(f"Authorized, joining room {self.room}")
         self.emit("join", {"channel": self.room}, namespace=self.namespace)
 
-    # def on_message(self, data):
-    #     self.proxy_control.log(data)
-
     def on_robot_proxy(self, data: dict):
         """
         Event fired for each message on the 'robot_proxy' channel
         """
         message_id = data.get("id", None)
         if str(message_id) != str(self.id):
-            # self.proxy_control.log("This message isn't for me, ignoring")
             return
         message_type = data.get("type", None)
         if message_type == "estop":
             # * Emergency Stop
-            self.proxy_control.log(f"Received: {data}")
             self.proxy_control.estop()
         elif message_type == "action":
-            self.proxy_control.log(f"Received: {data}")
             # * Action
             action = data.get("action", None)
             if action == "move_distance" or action == "/move_distance":
@@ -111,6 +107,25 @@ class SocketComms(socketio.ClientNamespace):
             else:
                 self.proxy_control.log("Unsupported topic, returning")
                 return
+        elif message_type == "set_scenario":
+            self.scenario_type = data.get("scenario_type", None)
+            self.scenario = data.get("scenario", None)
+        elif message_type == "get_scenario":
+            if self.scenario is not None:
+                return self.scenario
+            else:
+                return False
+        elif message_type == "running":
+            return self.proxy_control.is_running
+        elif message_type == "run":
+            self.proxy_control.run_scenario(self.scenario, self.scenario_type)
+        elif message_type == "get_state":
+            return {
+                "latitude": self.proxy_control.last_navsat_fix.latitude,
+                "longitude": self.proxy_control.last_navsat_fix.longitude,
+                "running": self.proxy_control.is_running,
+                "disabled": self.proxy_control.is_disabled(),  # Is the robot restricted from computer control override or e-stop
+            }
         else:
             # self.proxy_control.log("Unrecognized message type, ignoring")
             return
@@ -171,27 +186,67 @@ class ProxyControl(Node):
         self.send_goal_future_move_distance = None
         self.cancel_move_distance_goal = None
         self.get_move_distance_result_future = None
+        self.is_running = False
         self.last_navsat_fix = NavSatFix()
+
+    def reset(self):
+        self.is_running = False
+        self.goal_handle = None
+        self.send_goal_future_move_distance = None
+        self.cancel_move_distance_goal = None
+        self.get_move_distance_result_future = None
 
     def log(self, message):
         self.get_logger().info(message)
 
     def estop(self):
+        """
+        Immediately disable the robot
+        """
         future = self.proxy_enable_service(self.estop_request)
         rclpy.spin_until_future_complete(self, future)
-        return self.future.result()
+        self.reset()
+        return future.result()
+
+    def is_disabled(self):
+        # TODO
+        return False
 
     def publish_cmd_vel(self, values):
+        """
+        Broadcast a cmd_vel topic received from the server as a
+        ROS message
+        """
         msg = json_message_converter.convert_json_to_ros_message(
             "geometry_msgs/Twist", values
         )
         self.cmd_vel_pub.publish(msg)
 
     def gps_filtered_callback(self, msg):
+        """
+        Update our GPS position estimate (used in our state updates)
+        """
         self.last_navsat_fix = msg
         self.socket_comms.status_update()
 
+    def feedback_callback(self, feedback):
+        """
+        Called when we have feedback from an action server
+        """
+        self.socket_comms.send_ros_message("feedback", feedback.feedback)
+
+    def run_scenario(self, scenario, scenario_type):
+        """
+        Run a scenario previously set by the server
+        """
+        # TODO
+        pass
+
     def move_distance_send_goal(self, values):
+        """
+        Handle a new goal from the server
+        """
+        self.is_running = True
         goal = values["move_distance_goal"]
         self.ac_move_distance.wait_for_server()
         self.send_goal_future_move_distance = self.ac_move_distance.send_goal_async(
@@ -199,13 +254,16 @@ class ProxyControl(Node):
                 meters_per_second=float(goal["meters_per_second"]),
                 meters=float(goal["meters"]),
             ),
-            feedback_callback=self.move_distance_feedback_callback,
+            feedback_callback=self.feedback_callback,
         )
         self.send_goal_future_move_distance.add_done_callback(
             self.move_distance_response_callback
         )
 
     def move_distance_cancel_goal(self):
+        """
+        Handle a goal cancellation from the server
+        """
         if self.goal_handle is not None:
             self.cancel_move_distance_goal = self.goal_handle.cancel_goal_async()
             self.cancel_move_distance_goal.add_done_callback(
@@ -215,36 +273,44 @@ class ProxyControl(Node):
         else:
             self.socket_comms.send_ros_message("cancel_response", False)
 
-    def move_distance_feedback_callback(self, feedback):
-        self.get_logger().info(f"Feedback Callback")
-        self.socket_comms.send_ros_message("feedback", feedback.feedback)
-
     def move_distance_response_callback(self, future):
-        self.get_logger().info(f"Response Callback triggered")
+        """
+        Called when our action server finishes processing a goal (i.e. accepted or rejected)
+        """
         self.goal_handle = future.result()
         self.socket_comms.send_message(
             "goal_response", {"accepted": self.goal_handle.accepted}
         )
 
     def move_distance_get_result_callback(self, future):
-        # self.get_logger().info(f"Result Callback triggered")
+        """
+        Called when we complete a goal
+        """
         result = future.result().result
-        self.goal_handle = None
-        self.get_move_distance_result_future = None
         self.socket_comms.send_ros_message("goal_result", result)
+        self.reset()
 
     def cancel_move_distance_finished_callback(self, future):
-        self.goal_handle = None
-        self.get_move_distance_result_future = None
+        """
+        Called when we finish cancelling a goal
+        """
         self.socket_comms.send_ros_message("cancel_result", future.result())
+        self.reset()
 
 
 def socket_io_spin(sio, socket_comms, proxy_control):
+    """
+    Keep our socketio client running indefinitely
+    """
     proxy_control.log("Spinning socket client.")
     sio.wait()
 
 
 def result_spin(sio, socket_comms, proxy_control):
+    """
+    This is a workaround to deal with a limitation in rclpy
+    that prevents adding callbacks within other callbacks
+    """
     while True:
         if proxy_control.goal_handle is not None:
             if proxy_control.get_move_distance_result_future is None:
