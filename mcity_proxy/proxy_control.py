@@ -111,14 +111,16 @@ class SocketComms(socketio.ClientNamespace):
             self.scenario_type = data.get("scenario_type", None)
             self.scenario = data.get("scenario", None)
         elif message_type == "get_scenario":
-            if self.scenario is not None:
-                return self.scenario
-            else:
+            if self.scenario is None:
                 return False
+            return self.scenario
         elif message_type == "running":
             return self.proxy_control.is_running
         elif message_type == "run":
-            self.proxy_control.run_scenario(self.scenario, self.scenario_type)
+            if self.scenario is None:
+                return False
+            self.scenario['id'] = self.id
+            return self.on_robot_proxy(data=self.scenario)
         elif message_type == "get_state":
             return {
                 "latitude": self.proxy_control.last_navsat_fix.latitude,
@@ -128,7 +130,7 @@ class SocketComms(socketio.ClientNamespace):
             }
         else:
             # self.proxy_control.log("Unrecognized message type, ignoring")
-            return
+            return False
 
     def send_ros_message(self, type, data):
         message = {
@@ -234,13 +236,6 @@ class ProxyControl(Node):
         Called when we have feedback from an action server
         """
         self.socket_comms.send_ros_message("feedback", feedback.feedback)
-
-    def run_scenario(self, scenario, scenario_type):
-        """
-        Run a scenario previously set by the server
-        """
-        # TODO
-        pass
 
     def move_distance_send_goal(self, values):
         """
