@@ -129,7 +129,6 @@ class SocketComms(socketio.ClientNamespace):
                 "disabled": self.proxy_control.is_disabled(),  # Is the robot restricted from computer control override or e-stop
             }
         else:
-            # self.proxy_control.log("Unrecognized message type, ignoring")
             return False
 
     def send_ros_message(self, type, data):
@@ -264,9 +263,9 @@ class ProxyControl(Node):
             self.cancel_move_distance_goal.add_done_callback(
                 self.cancel_move_distance_finished_callback
             )
-            self.socket_comms.send_ros_message("cancel_response", True)
+            self.socket_comms.send_message("cancel_response", True)
         else:
-            self.socket_comms.send_ros_message("cancel_response", False)
+            self.socket_comms.send_message("cancel_response", False)
 
     def move_distance_response_callback(self, future):
         """
