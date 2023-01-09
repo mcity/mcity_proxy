@@ -9,6 +9,7 @@ from nav_msgs.msg import Odometry
 from mcity_proxy_msgs.action import MoveDistance
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from segway_msgs.srv import RosSetChassisEnableCmd
+from segway_msgs.msg import BmsFb
 from rclpy_message_converter import json_message_converter
 from sensor_msgs.msg import NavSatFix
 
@@ -119,7 +120,7 @@ class SocketComms(socketio.ClientNamespace):
         elif message_type == "run":
             if self.scenario is None:
                 return False
-            self.scenario['id'] = self.id
+            self.scenario["id"] = self.id
             return self.on_robot_proxy(data=self.scenario)
         elif message_type == "get_state":
             return {
@@ -128,8 +129,27 @@ class SocketComms(socketio.ClientNamespace):
                 "running": self.proxy_control.is_running,
                 "disabled": self.proxy_control.is_disabled(),  # Is the robot restricted from computer control override or e-stop
             }
+        elif message_type == "get_batt":
+            if self.proxy_control.last_bms_fb is None:
+                return False
+            return {
+                "charging": self.proxy_control.last_bms_fb.bat_charging == 1,
+                "percent": self.proxy_control.last_bms_fb.bat_soc,
+                "voltage": self.proxy_control.last_bms_fb.bat_vol,
+            }
+        elif message_type == "get_conn":
+            try:
+                iwout = os.popen("iwconfig").read()
+                m = re.findall('(wlan[0-9]+).*?Signal level=([0-9/]+)', iwout, re.DOTALL)
+                return {
+                    "type": "WIFI",  # DSRC, WIFI, CELLULAR, ZIGBEE, ETHERNET, DIRECT
+                    "strength": m[0][1],
+                    "network": os.popen("iwgetid -r").read()[:-1],
+                }
+            except:
+                return False
         else:
-            return False
+            return
 
     def send_ros_message(self, type, data):
         message = {
@@ -150,7 +170,10 @@ class SocketComms(socketio.ClientNamespace):
             "data": {
                 "navsat_fix": json_message_converter.convert_ros_message_to_json(
                     self.proxy_control.last_navsat_fix
-                )
+                ),
+                "battery_state": json_message_converter.convert_ros_message_to_json(
+                    self.proxy_control.last_bms_fb
+                ),
             },
         }
         self.emit(self.channel, message)
@@ -181,6 +204,9 @@ class ProxyControl(Node):
         self.gps_fitered_sub = self.create_subscription(
             NavSatFix, "/gps/filtered", self.gps_filtered_callback, 10
         )
+        self.bms_fb_sub = self.create_subscription(
+            BmsFb, "/bms_fb", self.bms_fb_callback, 10
+        )
 
         # *Local Data Members
         self.goal_handle = None
@@ -189,6 +215,7 @@ class ProxyControl(Node):
         self.get_move_distance_result_future = None
         self.is_running = False
         self.last_navsat_fix = NavSatFix()
+        self.last_bms_fb = None
 
     def reset(self):
         self.is_running = False
@@ -228,6 +255,13 @@ class ProxyControl(Node):
         Update our GPS position estimate (used in our state updates)
         """
         self.last_navsat_fix = msg
+        self.socket_comms.status_update()
+
+    def bms_fb_callback(self, msg):
+        """
+        Update our battery status info (used in our state updates)
+        """
+        self.last_bms_fb = msg
         self.socket_comms.status_update()
 
     def feedback_callback(self, feedback):
