@@ -12,7 +12,6 @@ class Cmd_Vel_Spin(Node):
     """
     Prevents the RMP from self-disabling if nothing is actively publishing on the cmd_vel topic
     """
-
     def __init__(self):
         super().__init__("cmd_vel_spin")
 

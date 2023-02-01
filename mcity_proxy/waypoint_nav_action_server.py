@@ -7,9 +7,12 @@ import threading
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist, Point, Pose, Quaternion, Vector3
 from nav_msgs.msg import Odometry
-from mcity_proxy_msgs.action import MoveDistance
+from mcity_proxy_msgs.action import WaypointNav
 from rclpy.callback_groups import ReentrantCallbackGroup
 from tf_transformations import euler_from_quaternion
+from robot_localization.src import FromLL, ToLL
+from sensor_msgs.msg import NavSatFix
+from geographic_msgs.msg import GeoPoint
 
 import time
 import math
@@ -20,12 +23,13 @@ from threading import Thread
 START_COURSE_CORRECT_THRESHOLD = 0.05
 STOP_COURSE_CORRECT_THRESHOLD = 0.01
 COURSE_CORRECTION_CUTOFF = 0.25
-ANGULAR_DEFLECTION_ABORT = np.pi / 2
+ANGULAR_DEFLECTION_ABORT = 2 * np.pi / 3
+GOAL_POSITION_TOLERANCE = 0.10
 
 
-class MoveDistanceActionServer(Node):
+class WaypointNavActionServer(Node):
     def __init__(self):
-        super().__init__("move_distance_action_server")
+        super().__init__("waypoint_nav_action_server")
         self.publisher_ = self.create_publisher(Twist, "cmd_vel", 10)
         self._goal_handle = None
         self._goal_lock = threading.Lock()
@@ -33,6 +37,19 @@ class MoveDistanceActionServer(Node):
         self.latest_pose = None
         self.kP = 0.5
         self.callback_group = ReentrantCallbackGroup()
+
+        self._action_server = ActionServer(
+            self,
+            WaypointNav,
+            "waypoint_nav",
+            execute_callback=self.execute_callback,
+            goal_callback=self.goal_callback,
+            handle_accepted_callback=self.handle_accepted_callback,
+            cancel_callback=self.cancel_callback,
+            callback_group=self.callback_group,
+        )
+
+        # *Subscriptions and Publishers
         self.odom_subscriber_ = self.create_subscription(
             Odometry,
             "/odometry/filtered",
@@ -40,16 +57,13 @@ class MoveDistanceActionServer(Node):
             10,
             callback_group=self.callback_group,
         )
-        self._action_server = ActionServer(
-            self,
-            MoveDistance,
-            "move_distance",
-            execute_callback=self.execute_callback,
-            goal_callback=self.goal_callback,
-            handle_accepted_callback=self.handle_accepted_callback,
-            cancel_callback=self.cancel_callback,
-            callback_group=self.callback_group,
+        self.to_ll_service_ = self.create_client(
+            ToLL, '/toLL'
         )
+        self.from_ll_service_ = self.create_client(
+            FromLL, '/fromLL'
+        )
+
 
     def destroy(self):
         self._action_server.destory()
@@ -65,40 +79,70 @@ class MoveDistanceActionServer(Node):
         self.latest_orientation_w = copy.deepcopy(msg.pose.pose.orientation.w)
 
     def goal_callback(self, goal_request):
-        self.get_logger().info("MoveDistance Action Server: Received Goal")
+        self.get_logger().info("WaypointNav Action Server: Received Goal")
         return GoalResponse.ACCEPT
 
     def handle_accepted_callback(self, goal_handle):
-        self.get_logger().info("MoveDistance Action Server: Handling Accepted Goal")
+        self.get_logger().info("WaypointNav Action Server: Handling Accepted Goal")
         with self._goal_lock:
-            # *This server only allows one goal at a time
+            # This server only allows one goal at a time
             if self._goal_handle is not None and self._goal_handle.is_active:
-                # *Abort the existing goal
+                # Abort the existing goal
                 self._goal_handle.abort()
             self._goal_handle = goal_handle
 
         goal_handle.execute()
 
     def cancel_callback(self, goal):
-        self.get_logger().info("MoveDistance Action Server: Cancelling Goal")
+        self.get_logger().info("WaypointNav Action Server: Cancelling Goal")
         return CancelResponse.ACCEPT
 
     def execute_callback(self, goal_handle):
-        self.get_logger().info("MoveDistance Action Server: Executing Goal")
-        velocity, distance, direction = self.handle_negative_vel_and_dist(goal_handle)
+        self.get_logger().info("WaypointNav Action Server: Executing Goal")
+        self.goal
+        waypoints = goal_handle.request.waypoints
+
+        for i in range(waypoints):
+            # * Make sure we haven't been cancelled or aborted
+            result = self.check_goal_state_change(self._goal_handle)
+            if result is not None:
+                return result
+            self.navigate_to_target(waypoints[i])
+
+        self._goal_handle.succeed()
+        result = WaypointNav.Result()
+        result.final_position = self.point_to_lat_long(
+            x=self.latest_pose.position.x, y=self.latest_pose.position.y
+        )
+        return result
+
+    def point_to_lat_long(self, x, y):
+        self.future = self.to_ll_service_.call_async(Point(x=float(x), y=float(y), z=0))
+        rclpy.spin_until_future_complete(self, self.future)
+        lat_long = self.future.result().ll_point
+        return GeoPoint(latitude=lat_long.latitude, longitude=lat_long.longitude, altitude=0)
+
+    def lat_long_to_point(self, lat_long):
+        self.future = self.from_ll_service_.call_async(lat_long)
+        rclpy.spin_until_future_complete(self, self.future)
+        point = self.future.result().map_point
+        return np.array([point.x, point.y, 0])
+
+    def navigate_to_target(self, waypoint, velocity):
+        self.goal_position = self.lat_long_to_point(waypoint.lat_long)
 
         # * Capture our intitial state and extrapolate goal information
         twist = Twist(linear=Vector3(x=velocity))
         self.publisher_.publish(twist)
         while self.latest_pose is None:
-            result = self.check_goal_state_change(goal_handle)
+            result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
             self.get_logger().info("Waiting for starting odometry...")
             time.sleep(1)
         start_pose = copy.deepcopy(self.latest_pose)
         start_position = np.array([start_pose.position.x, start_pose.position.y, 0.0])
-        feedback_msg = MoveDistance.Feedback()
+        feedback_msg = WaypointNav.Feedback()
 
         current_position = np.array(
             [
@@ -108,29 +152,34 @@ class MoveDistanceActionServer(Node):
             ]
         )
 
-        while np.linalg.norm(current_position - start_position) < 0.01:
-            # * Make sure we haven't been cancelled or aborted
-            result = self.check_goal_state_change(goal_handle)
-            if result is not None:
-                return result
-            current_position = np.array(
-                [
-                    self.latest_pose.position.x,
-                    self.latest_pose.position.y,
-                    0.0,
-                ]
-            )
+        # # * Wait for us to go far enough to establish a proper heading
+        # while np.linalg.norm(current_position - start_position) < 0.01:
+        #     # * Make sure we haven't been cancelled or aborted
+        #     result = self.check_goal_state_change(self._goal_handle)
+        #     if result is not None:
+        #         return result
+        #     current_position = np.array(
+        #         [
+        #             self.latest_pose.position.x,
+        #             self.latest_pose.position.y,
+        #             0.0,
+        #         ]
+        #     )
 
-        goal_heading = current_position - start_position
-        goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
-        self.goal_position = start_position + np.dot(distance, goal_heading_unit)
+        # goal_heading = current_position - start_position
+        # goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
+        # self.goal_position = start_position + np.dot(distance, goal_heading_unit)
         previous_position = current_position.copy()
+
+        # self.get_logger().info(f"START POSITION: {start_position}")
+        # self.get_logger().info(f"GOAL POSITION: {goal_position}")
 
         tick = time.time()
         threshold = START_COURSE_CORRECT_THRESHOLD
-        while np.linalg.norm(current_position - start_position) < np.abs(distance):
+        # *Check if we've arrived
+        while np.linalg.norm(current_position - goal_position) < GOAL_POSITION_TOLERANCE:
             # * Make sure we haven't been cancelled or aborted
-            result = self.check_goal_state_change(goal_handle)
+            result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
 
@@ -169,20 +218,20 @@ class MoveDistanceActionServer(Node):
                         1.0,
                     )
                 )
-                if np.abs(angular_deflection) > ANGULAR_DEFLECTION_ABORT:
-                    self.get_logger().info(
-                        f"Goal aborted. Too far off course. {angular_deflection}"
-                    )
-                    goal_handle.abort()
-                    twist = Twist()
-                    self.publisher_.publish(twist)
-                    result = MoveDistance.Result()
-                    result.final_position = Point(
-                        x=self.latest_pose.position.x,
-                        y=self.latest_pose.position.y,
-                        z=0.0,
-                    )
-                    return result
+                # if np.abs(angular_deflection) > ANGULAR_DEFLECTION_ABORT:
+                #     self.get_logger().info(
+                #         f"Goal aborted. Too far off course. {angular_deflection}"
+                #     )
+                #     self._goal_handle.abort()
+                #     twist = Twist()
+                #     self.publisher_.publish(twist)
+                #     result = MoveDistance.Result()
+                #     result.final_position = Point(
+                #         x=self.latest_pose.position.x,
+                #         y=self.latest_pose.position.y,
+                #         z=0.0,
+                #     )
+                #     return result
 
                 if np.abs(angular_deflection) > threshold:
                     if threshold == START_COURSE_CORRECT_THRESHOLD:
@@ -202,54 +251,25 @@ class MoveDistanceActionServer(Node):
             self.publisher_.publish(twist)
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second
-                feedback_msg.current_position = Point(
-                    x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
+                feedback_msg.current_position = self.point_to_lat_long(
+                    x=self.latest_pose.position.x, y=self.latest_pose.position.y
                 )
-                feedback_msg.goal_position = Point(
-                    x=self.goal_position[0], y=self.goal_position[1], z=0.0
-                )
-                goal_handle.publish_feedback(feedback_msg)
+                self._goal_handle.publish_feedback(feedback_msg)
                 tick = time.time()
         # * endwhile
 
         twist = Twist()
         self.publisher_.publish(twist)
 
-        goal_handle.succeed()
-        result = MoveDistance.Result()
-        result.final_position = Point(
-            x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
-        )
-        result.goal_position = Point(
-            x=self.goal_position[0], y=self.goal_position[1], z=0.0
-        )
-
-        return result
-
-    def handle_negative_vel_and_dist(self, goal_handle):
-        velocity = float(goal_handle.request.meters_per_second)
-        distance = float(goal_handle.request.meters)
-        direction = 1
-        if float(goal_handle.request.meters) < 0.0:
-            direction = -1
-            if float(goal_handle.request.meters_per_second) > 0.0:
-                velocity *= -1
-        elif float(goal_handle.request.meters_per_second) < 0.0:
-            direction = -1
-            distance *= -1
-        return velocity, distance, direction
 
     def check_goal_state_change(self, goal_handle):
         result = None
         if not goal_handle.is_active:
             # *Another goal was set: abort, and return the current position
             self.get_logger().info("Goal aborted.")
-            result = MoveDistance.Result()
-            result.final_position = Point(
-                x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
-            )
-            result.goal_position = Point(
-                x=self.goal_position[0], y=self.goal_position[1], z=0.0
+            result = WaypointNav.Result()
+            result.final_position = self.point_to_lat_long(
+                x=self.latest_pose.position.x, y=self.latest_pose.position.y
             )
         if goal_handle.is_cancel_requested:
             # *Goal was canceled, stop the robot and return the current position
@@ -257,28 +277,26 @@ class MoveDistanceActionServer(Node):
             goal_handle.canceled()
             twist = Twist()
             self.publisher_.publish(twist)
-            result = MoveDistance.Result()
-            result.final_position = Point(
-                x=self.latest_pose.position.x, y=self.latest_pose.position.y, z=0.0
+            result = WaypointNav.Result()
+            result.final_position = self.point_to_lat_long(
+                x=self.latest_pose.position.x, y=self.latest_pose.position.y
             )
-            result.goal_position = Point(
-                x=self.goal_position[0], y=self.goal_position[1], z=0.0
-            )
+
         return result
 
 
 def main(args=None):
     rclpy.init(args=args)
 
-    move_distance_action_server = MoveDistanceActionServer()
+    waypoint_nav_action_server = WaypointNavActionServer()
     multi_exec = MultiThreadedExecutor(num_threads=8)
-    multi_exec.add_node(move_distance_action_server)
+    multi_exec.add_node(waypoint_nav_action_server)
     multi_exec.spin()
 
     # Destroy nodes explicitly
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
-    move_distance_action_server.destroy()
+    waypoint_nav_action_server.destroy()
     rclpy.shutdown()
 
 

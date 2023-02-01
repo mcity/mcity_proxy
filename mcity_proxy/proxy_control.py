@@ -6,12 +6,13 @@ from rclpy.action import ActionClient
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist, Vector3
 from nav_msgs.msg import Odometry
-from mcity_proxy_msgs.action import MoveDistance
+from mcity_proxy_msgs.action import MoveDistance, WaypointNav
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from segway_msgs.srv import RosSetChassisEnableCmd
 from segway_msgs.msg import BmsFb
 from rclpy_message_converter import json_message_converter
 from sensor_msgs.msg import NavSatFix
+from geographic_msgs.msg import GeoPoint
 
 import os
 import time
@@ -77,40 +78,20 @@ class SocketComms(socketio.ClientNamespace):
         message_type = data.get("type", None)
         if message_type == "estop":
             # * Emergency Stop
-            self.proxy_control.estop()
+            return self.proxy_control.estop()
         elif message_type == "action":
             # * Action
-            action = data.get("action", None)
-            if action == "move_distance" or action == "/move_distance":
-                # * Move Distance Action
-                cancel = data.get("cancel", None)
-                if cancel is not None and cancel:
-                    # * Cancel current goal
-                    self.proxy_control.move_distance_cancel_goal()
-                values = data.get("values", None)
-                if values is not None:
-                    # * Send a new goal
-                    self.proxy_control.move_distance_send_goal(values)
-            else:
-                self.proxy_control.log("Unknown action type, returning")
-                return
+            return self.handle_action(data)
         elif message_type == "service":
-            self.proxy_control.log(f"Received: {data}")
             # * Service
-            self.proxy_control.log("No services currently supported, ignoring")
-            return
+            return self.handle_service(data)
         elif message_type == "topic":
-            self.proxy_control.log(f"Received: {data}")
-            topic = data.get("topic", None)
-            values = data.get("values", None)
-            if topic == "cmd_vel" or topic == "/cmd_vel":
-                self.proxy_control.publish_cmd_vel(values)
-            else:
-                self.proxy_control.log("Unsupported topic, returning")
-                return
+            # * Topic
+            return self.handle_topic(data)
         elif message_type == "set_scenario":
             self.scenario_type = data.get("scenario_type", None)
             self.scenario = data.get("scenario", None)
+            return True
         elif message_type == "get_scenario":
             if self.scenario is None:
                 return False
@@ -140,7 +121,10 @@ class SocketComms(socketio.ClientNamespace):
         elif message_type == "get_conn":
             try:
                 iwout = os.popen("iwconfig").read()
-                m = re.findall('(wlan[0-9]+).*?Signal level=([0-9/]+)', iwout, re.DOTALL)
+                # * Below is what we in the business call "Magical regex that'll find the thing you need"
+                m = re.findall(
+                    "(wlan[0-9]+).*?Signal level=([0-9/]+)", iwout, re.DOTALL
+                )
                 return {
                     "type": "WIFI",  # DSRC, WIFI, CELLULAR, ZIGBEE, ETHERNET, DIRECT
                     "strength": m[0][1],
@@ -151,10 +135,59 @@ class SocketComms(socketio.ClientNamespace):
         else:
             return
 
-    def send_ros_message(self, type, data):
+    def handle_action(self, data: dict):
+        self.proxy_control.log(f"Received: {data}")
+        action = data.get("action", None)
+        if action == "move_distance" or action == "/move_distance":
+            # * Move Distance Action
+            cancel = data.get("cancel", None)
+            if cancel is not None and cancel:
+                # * Cancel current goal
+                return self.proxy_control.cancel_goal()
+            values = data.get("values", None)
+            if values is not None:
+                # * Send a new goal
+                return self.proxy_control.move_distance_send_goal(values)
+            else:
+                self.proxy_control.log("No values provided.")
+                return "Please provide a velocity and distance"
+        elif action == "waypoint_nav" or action == "/waypoint_nav":
+            # * Execute Waypoint Navigation Action
+            cancel = data.get("cancel", None)
+            if cancel is not None and cancel:
+                # * Cancel current goal
+                return self.proxy_control.cancel_goal()
+            values = data.get("values", None)
+            if values is not None:
+                # * Send a new goal
+                return self.proxy_control.waypoint_nav_send_goal(values)
+            else:
+                self.proxy_control.log("No waypoints provided.")
+                return "Please provide an array of waypoints"
+        else:
+            self.proxy_control.log("Unknown action type, returning")
+            return "Unknown action type"
+
+    def handle_service(self, data: dict):
+        self.proxy_control.log(f"Received: {data}")
+        service = data.get("service", None)
+        self.proxy_control.log("Service not currently supported, ignoring")
+        return "Unsupported Service"
+
+    def handle_topic(self, data: dict):
+        self.proxy_control.log(f"Received: {data}")
+        topic = data.get("topic", None)
+        values = data.get("values", None)
+        if topic == "cmd_vel" or topic == "/cmd_vel":
+            return self.proxy_control.publish_cmd_vel(values)
+        else:
+            self.proxy_control.log("Unsupported topic, returning")
+            return "Unsupported Topic"
+
+    def send_ros_message(self, message_type, data):
         message = {
             "id": self.id,
-            "type": type,
+            "type": message_type,
             "data": json_message_converter.convert_ros_message_to_json(data),
         }
         self.emit(self.channel, message)
@@ -185,8 +218,9 @@ class ProxyControl(Node):
     def __init__(self):
         super().__init__("action_manager")
 
-        # *Action Client
+        # *Action Clients
         self.ac_move_distance = ActionClient(self, MoveDistance, "move_distance")
+        self.ac_waypoint_nav = ActionClient(self, WaypointNav, "waypoint_nav")
 
         # *Services
         self.proxy_enable_service = self.create_client(
@@ -209,10 +243,7 @@ class ProxyControl(Node):
         )
 
         # *Local Data Members
-        self.goal_handle = None
-        self.send_goal_future_move_distance = None
-        self.cancel_move_distance_goal = None
-        self.get_move_distance_result_future = None
+        self.reset()
         self.is_running = False
         self.last_navsat_fix = NavSatFix()
         self.last_bms_fb = None
@@ -221,8 +252,11 @@ class ProxyControl(Node):
         self.is_running = False
         self.goal_handle = None
         self.send_goal_future_move_distance = None
+        self.send_goal_future_waypoint_nav = None
         self.cancel_move_distance_goal = None
+        self.cancel_waypoint_nav_goal = None
         self.get_move_distance_result_future = None
+        self.get_waypoint_nav_result_future = None
 
     def log(self, message):
         self.get_logger().info(message)
@@ -272,7 +306,7 @@ class ProxyControl(Node):
 
     def move_distance_send_goal(self, values):
         """
-        Handle a new goal from the server
+        Handle a new MoveDistance goal from the server
         """
         self.is_running = True
         goal = values["move_distance_goal"]
@@ -284,24 +318,42 @@ class ProxyControl(Node):
             ),
             feedback_callback=self.feedback_callback,
         )
-        self.send_goal_future_move_distance.add_done_callback(
-            self.move_distance_response_callback
-        )
+        self.send_goal_future_move_distance.add_done_callback(self.response_callback)
 
-    def move_distance_cancel_goal(self):
+    def waypoint_nav_send_goal(self, values):
+        """
+        Handle a new WaypointNav goal from the server
+        """
+        self.is_running = True
+        goal = values.get("waypoint_nav_goal", None)
+        self.ac_waypoint_nav.wait_for_server()
+        waypoints = []
+        try:
+            for waypoint in goal["waypoints"]:
+                waypoints.append(Waypoint(GeoPoint(waypoint[0], waypoint[1], 0), float(waypoint[2])))
+        except:
+            self.log(f"Failed to parse ${waypoints}, exiting")
+            return False
+        self.send_goal_future_waypoint_nav = self.ac_waypoint_nav.send_goal_async(
+            WaypointNav.Goal(waypoints=waypoints),
+            feedback_callback=self.feedback_callback,
+        )
+        self.send_goal_future_waypoint_nav.add_done_callback(self.response_callback)
+
+    def cancel_goal(self):
         """
         Handle a goal cancellation from the server
         """
         if self.goal_handle is not None:
             self.cancel_move_distance_goal = self.goal_handle.cancel_goal_async()
             self.cancel_move_distance_goal.add_done_callback(
-                self.cancel_move_distance_finished_callback
+                self.cancel_finished_callback
             )
             self.socket_comms.send_message("cancel_response", True)
         else:
             self.socket_comms.send_message("cancel_response", False)
 
-    def move_distance_response_callback(self, future):
+    def response_callback(self, future):
         """
         Called when our action server finishes processing a goal (i.e. accepted or rejected)
         """
@@ -310,7 +362,7 @@ class ProxyControl(Node):
             "goal_response", {"accepted": self.goal_handle.accepted}
         )
 
-    def move_distance_get_result_callback(self, future):
+    def get_result_callback(self, future):
         """
         Called when we complete a goal
         """
@@ -318,7 +370,7 @@ class ProxyControl(Node):
         self.socket_comms.send_ros_message("goal_result", result)
         self.reset()
 
-    def cancel_move_distance_finished_callback(self, future):
+    def cancel_finished_callback(self, future):
         """
         Called when we finish cancelling a goal
         """
@@ -346,7 +398,7 @@ def result_spin(sio, socket_comms, proxy_control):
                     proxy_control.goal_handle.get_result_async()
                 )
                 proxy_control.get_move_distance_result_future.add_done_callback(
-                    proxy_control.move_distance_get_result_callback
+                    proxy_control.get_result_callback
                 )
         time.sleep(0.1)
 
