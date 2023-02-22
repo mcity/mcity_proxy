@@ -10,7 +10,7 @@ from nav_msgs.msg import Odometry
 from mcity_proxy_msgs.action import WaypointNav
 from rclpy.callback_groups import ReentrantCallbackGroup
 from tf_transformations import euler_from_quaternion
-from robot_localization.src import FromLL, ToLL
+from robot_localization.srv import FromLL, ToLL
 from sensor_msgs.msg import NavSatFix
 from geographic_msgs.msg import GeoPoint
 
@@ -24,7 +24,7 @@ START_COURSE_CORRECT_THRESHOLD = 0.05
 STOP_COURSE_CORRECT_THRESHOLD = 0.01
 COURSE_CORRECTION_CUTOFF = 0.25
 ANGULAR_DEFLECTION_ABORT = 2 * np.pi / 3
-GOAL_POSITION_TOLERANCE = 0.10
+GOAL_POSITION_TOLERANCE = 10.0
 
 
 class WaypointNavActionServer(Node):
@@ -99,15 +99,14 @@ class WaypointNavActionServer(Node):
 
     def execute_callback(self, goal_handle):
         self.get_logger().info("WaypointNav Action Server: Executing Goal")
-        self.goal
         waypoints = goal_handle.request.waypoints
 
-        for i in range(waypoints):
+        for pt in waypoints:
             # * Make sure we haven't been cancelled or aborted
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
-            self.navigate_to_target(waypoints[i])
+            self.navigate_to_target(pt)
 
         self._goal_handle.succeed()
         result = WaypointNav.Result()
@@ -117,22 +116,22 @@ class WaypointNavActionServer(Node):
         return result
 
     def point_to_lat_long(self, x, y):
-        self.future = self.to_ll_service_.call_async(Point(x=float(x), y=float(y), z=0))
+        self.future = self.to_ll_service_.call_async(ToLL.Request(map_point=Point(x=float(x), y=float(y), z=0.0)))
         rclpy.spin_until_future_complete(self, self.future)
         lat_long = self.future.result().ll_point
-        return GeoPoint(latitude=lat_long.latitude, longitude=lat_long.longitude, altitude=0)
+        return GeoPoint(latitude=lat_long.latitude, longitude=lat_long.longitude, altitude=0.0)
 
     def lat_long_to_point(self, lat_long):
-        self.future = self.from_ll_service_.call_async(lat_long)
+        self.future = self.from_ll_service_.call_async(FromLL.Request(ll_point=lat_long))
         rclpy.spin_until_future_complete(self, self.future)
         point = self.future.result().map_point
         return np.array([point.x, point.y, 0])
 
-    def navigate_to_target(self, waypoint, velocity):
+    def navigate_to_target(self, waypoint):
         self.goal_position = self.lat_long_to_point(waypoint.lat_long)
 
         # * Capture our intitial state and extrapolate goal information
-        twist = Twist(linear=Vector3(x=velocity))
+        twist = Twist(linear=Vector3(x=waypoint.velocity))
         self.publisher_.publish(twist)
         while self.latest_pose is None:
             result = self.check_goal_state_change(self._goal_handle)
@@ -151,13 +150,15 @@ class WaypointNavActionServer(Node):
                 0.0,
             ]
         )
-
-        # # * Wait for us to go far enough to establish a proper heading
+        # * Wait for us to go far enough to establish a proper heading
         # while np.linalg.norm(current_position - start_position) < 0.01:
+        #     self.get_logger().info(f"Wait for heading...{np.linalg.norm(current_position - start_position)}")
+        #     self.get_logger().info(f"{self.latest_pose}")
         #     # * Make sure we haven't been cancelled or aborted
         #     result = self.check_goal_state_change(self._goal_handle)
         #     if result is not None:
         #         return result
+        #     self.publisher_.publish(twist)
         #     current_position = np.array(
         #         [
         #             self.latest_pose.position.x,
@@ -166,23 +167,21 @@ class WaypointNavActionServer(Node):
         #         ]
         #     )
 
-        # goal_heading = current_position - start_position
-        # goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
-        # self.goal_position = start_position + np.dot(distance, goal_heading_unit)
         previous_position = current_position.copy()
-
-        # self.get_logger().info(f"START POSITION: {start_position}")
-        # self.get_logger().info(f"GOAL POSITION: {goal_position}")
+        self.get_logger().info(f"START POSITION: {start_position}")
+        self.get_logger().info(f"GOAL POSITION: {self.goal_position}")
 
         tick = time.time()
         threshold = START_COURSE_CORRECT_THRESHOLD
         # *Check if we've arrived
-        while np.linalg.norm(current_position - goal_position) < GOAL_POSITION_TOLERANCE:
+        while np.linalg.norm(current_position - self.goal_position) > GOAL_POSITION_TOLERANCE:
+            self.get_logger().info("Loop")
             # * Make sure we haven't been cancelled or aborted
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
 
+            # *Update Current Position
             current_position = np.array(
                 [
                     self.latest_pose.position.x,
@@ -191,15 +190,16 @@ class WaypointNavActionServer(Node):
                 ]
             )
 
-            # * If we haven't yet moved far enough to establish orientation, wait before any course correction
-            if np.linalg.norm(current_position - previous_position) < 0.01:
-                self.publisher_.publish(twist)
-                continue
+            # # * If we haven't yet moved far enough to establish orientation, wait before any course correction
+            # if np.linalg.norm(current_position - previous_position) < 0.01:
+            #     self.get_logger().info("Waiting to establish orientation")
+            #     self.publisher_.publish(twist)
+            #     continue
 
             # * Figure out our current heading and the heading we want to be on
             current_heading = current_position - previous_position
             current_heading_unit = (
-                current_heading / np.linalg.norm(current_heading) * direction
+                current_heading / np.linalg.norm(current_heading)
             )
             previous_position = current_position.copy()
             goal_heading = self.goal_position - current_position
@@ -208,9 +208,10 @@ class WaypointNavActionServer(Node):
             theta = 0.0
             # * Stop course correction when we're within COURSE_CORRECTION_CUTOFF
             if (
-                np.abs(distance) - np.linalg.norm(current_position - start_position)
+                np.linalg.norm(current_position - self.goal_position)
                 > COURSE_CORRECTION_CUTOFF
             ):
+                self.get_logger().info("Course Correcting")
                 angular_deflection = np.arccos(
                     np.clip(
                         np.dot(goal_heading_unit, current_heading_unit),
@@ -237,7 +238,7 @@ class WaypointNavActionServer(Node):
                     if threshold == START_COURSE_CORRECT_THRESHOLD:
                         threshold = STOP_COURSE_CORRECT_THRESHOLD
                     theta = (  # * Attenuate our corrective angular velocity by kP
-                        self.kP * angular_deflection * direction
+                        self.kP * angular_deflection
                     )
                     # * Figure out which direction to turn
                     cross_product = np.cross(goal_heading_unit, current_heading_unit)
@@ -247,10 +248,11 @@ class WaypointNavActionServer(Node):
                     if threshold == STOP_COURSE_CORRECT_THRESHOLD:
                         threshold = START_COURSE_CORRECT_THRESHOLD
 
-            twist.angular.z = theta
+            twist.angular.z = float(theta)
             self.publisher_.publish(twist)
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second
+                self.get_logger().info("Feedback")
                 feedback_msg.current_position = self.point_to_lat_long(
                     x=self.latest_pose.position.x, y=self.latest_pose.position.y
                 )
