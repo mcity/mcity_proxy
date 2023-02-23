@@ -169,8 +169,8 @@ class WaypointNavActionServer(Node):
                 2
                 * (
                     np.arctan2(
-                        self.goal_position.y - current_position.y,
-                        self.goal_position.x - current_position.x,
+                        self.goal_position[1] - current_position[1],
+                        self.goal_position[0] - current_position[0],
                     )
                     - yaw
                 )
