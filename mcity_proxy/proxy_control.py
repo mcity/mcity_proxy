@@ -7,6 +7,7 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Twist, Vector3
 from nav_msgs.msg import Odometry
 from mcity_proxy_msgs.action import MoveDistance, WaypointNav
+from mcity_proxy_msgs.msg import Waypoint
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from segway_msgs.srv import RosSetChassisEnableCmd
 from segway_msgs.msg import BmsFb
@@ -22,6 +23,7 @@ from threading import Thread, Lock
 import socketio
 import json
 import time
+import re
 
 
 class SocketComms(socketio.ClientNamespace):
@@ -235,7 +237,7 @@ class ProxyControl(Node):
         self.cmd_vel_pub = self.create_publisher(Twist, "cmd_vel", 10)
 
         # *Topic Subscribers
-        self.gps_fitered_sub = self.create_subscription(
+        self.gps_filtered_sub = self.create_subscription(
             NavSatFix, "/gps/filtered", self.gps_filtered_callback, 10
         )
         self.bms_fb_sub = self.create_subscription(
