@@ -20,11 +20,10 @@ import copy
 import numpy as np
 from threading import Thread
 
-START_COURSE_CORRECT_THRESHOLD = 0.05
-STOP_COURSE_CORRECT_THRESHOLD = 0.01
+COURSE_CORRECT_THRESHOLD = 0.01
 COURSE_CORRECTION_CUTOFF = 0.25
 ANGULAR_DEFLECTION_ABORT = 2 * np.pi / 3
-GOAL_POSITION_TOLERANCE = 10.0
+GOAL_POSITION_TOLERANCE = 1.0
 
 
 class WaypointNavActionServer(Node):
@@ -57,26 +56,15 @@ class WaypointNavActionServer(Node):
             10,
             callback_group=self.callback_group,
         )
-        self.to_ll_service_ = self.create_client(
-            ToLL, '/toLL'
-        )
-        self.from_ll_service_ = self.create_client(
-            FromLL, '/fromLL'
-        )
-
+        self.to_ll_service_ = self.create_client(ToLL, "/toLL")
+        self.from_ll_service_ = self.create_client(FromLL, "/fromLL")
 
     def destroy(self):
-        self._action_server.destory()
+        self._action_server.destroy()
         super().destroy_node()
 
     def odom_callback(self, msg):
         self.latest_pose = copy.deepcopy(msg.pose.pose)
-        self.latest_pose_x = copy.deepcopy(msg.pose.pose.position.x)
-        self.latest_pose_y = copy.deepcopy(msg.pose.pose.position.y)
-        self.latest_orientation_x = copy.deepcopy(msg.pose.pose.orientation.x)
-        self.latest_orientation_y = copy.deepcopy(msg.pose.pose.orientation.y)
-        self.latest_orientation_z = copy.deepcopy(msg.pose.pose.orientation.z)
-        self.latest_orientation_w = copy.deepcopy(msg.pose.pose.orientation.w)
 
     def goal_callback(self, goal_request):
         self.get_logger().info("WaypointNav Action Server: Received Goal")
@@ -116,13 +104,19 @@ class WaypointNavActionServer(Node):
         return result
 
     def point_to_lat_long(self, x, y):
-        self.future = self.to_ll_service_.call_async(ToLL.Request(map_point=Point(x=float(x), y=float(y), z=0.0)))
+        self.future = self.to_ll_service_.call_async(
+            ToLL.Request(map_point=Point(x=float(x), y=float(y), z=0.0))
+        )
         rclpy.spin_until_future_complete(self, self.future)
         lat_long = self.future.result().ll_point
-        return GeoPoint(latitude=lat_long.latitude, longitude=lat_long.longitude, altitude=0.0)
+        return GeoPoint(
+            latitude=lat_long.latitude, longitude=lat_long.longitude, altitude=0.0
+        )
 
     def lat_long_to_point(self, lat_long):
-        self.future = self.from_ll_service_.call_async(FromLL.Request(ll_point=lat_long))
+        self.future = self.from_ll_service_.call_async(
+            FromLL.Request(ll_point=lat_long)
+        )
         rclpy.spin_until_future_complete(self, self.future)
         point = self.future.result().map_point
         return np.array([point.x, point.y, 0])
@@ -130,17 +124,9 @@ class WaypointNavActionServer(Node):
     def navigate_to_target(self, waypoint):
         self.goal_position = self.lat_long_to_point(waypoint.lat_long)
 
-        # * Capture our intitial state and extrapolate goal information
+        # * Capture our initial state and extrapolate goal information
         twist = Twist(linear=Vector3(x=waypoint.velocity))
         self.publisher_.publish(twist)
-        while self.latest_pose is None:
-            result = self.check_goal_state_change(self._goal_handle)
-            if result is not None:
-                return result
-            self.get_logger().info("Waiting for starting odometry...")
-            time.sleep(1)
-        start_pose = copy.deepcopy(self.latest_pose)
-        start_position = np.array([start_pose.position.x, start_pose.position.y, 0.0])
         feedback_msg = WaypointNav.Feedback()
 
         current_position = np.array(
@@ -150,38 +136,18 @@ class WaypointNavActionServer(Node):
                 0.0,
             ]
         )
-        # * Wait for us to go far enough to establish a proper heading
-        # while np.linalg.norm(current_position - start_position) < 0.01:
-        #     self.get_logger().info(f"Wait for heading...{np.linalg.norm(current_position - start_position)}")
-        #     self.get_logger().info(f"{self.latest_pose}")
-        #     # * Make sure we haven't been cancelled or aborted
-        #     result = self.check_goal_state_change(self._goal_handle)
-        #     if result is not None:
-        #         return result
-        #     self.publisher_.publish(twist)
-        #     current_position = np.array(
-        #         [
-        #             self.latest_pose.position.x,
-        #             self.latest_pose.position.y,
-        #             0.0,
-        #         ]
-        #     )
-
-        previous_position = current_position.copy()
-        self.get_logger().info(f"START POSITION: {start_position}")
-        self.get_logger().info(f"GOAL POSITION: {self.goal_position}")
 
         tick = time.time()
-        threshold = START_COURSE_CORRECT_THRESHOLD
-        # *Check if we've arrived
-        while np.linalg.norm(current_position - self.goal_position) > GOAL_POSITION_TOLERANCE:
-            self.get_logger().info("Loop")
+        while (
+            np.linalg.norm(current_position - self.goal_position)
+            > GOAL_POSITION_TOLERANCE
+        ): # *Loop until we've arrived
             # * Make sure we haven't been cancelled or aborted
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
 
-            # *Update Current Position
+            # *Update Current Position and Orientation
             current_position = np.array(
                 [
                     self.latest_pose.position.x,
@@ -189,67 +155,35 @@ class WaypointNavActionServer(Node):
                     0.0,
                 ]
             )
+            yaw = euler_from_quaternion(
+                [
+                    self.latest_pose.orientation.x,
+                    self.latest_pose.orientation.y,
+                    self.latest_pose.orientation.z,
+                    self.latest_pose.orientation.w,
+                ]
+            )[2]
 
-            # # * If we haven't yet moved far enough to establish orientation, wait before any course correction
-            # if np.linalg.norm(current_position - previous_position) < 0.01:
-            #     self.get_logger().info("Waiting to establish orientation")
-            #     self.publisher_.publish(twist)
-            #     continue
-
-            # * Figure out our current heading and the heading we want to be on
-            current_heading = current_position - previous_position
-            current_heading_unit = (
-                current_heading / np.linalg.norm(current_heading)
+            # *Calculate how much we need to turn to correct our heading (multiply by 2 to make it faster)
+            theta = float(
+                2
+                * (
+                    np.arctan2(
+                        self.goal_position.y - current_position.y,
+                        self.goal_position.x - current_position.x,
+                    )
+                    - yaw
+                )
             )
-            previous_position = current_position.copy()
-            goal_heading = self.goal_position - current_position
-            goal_heading_unit = goal_heading / np.linalg.norm(goal_heading)
 
-            theta = 0.0
-            # * Stop course correction when we're within COURSE_CORRECTION_CUTOFF
-            if (
+            if theta > COURSE_CORRECT_THRESHOLD and (
                 np.linalg.norm(current_position - self.goal_position)
                 > COURSE_CORRECTION_CUTOFF
-            ):
-                self.get_logger().info("Course Correcting")
-                angular_deflection = np.arccos(
-                    np.clip(
-                        np.dot(goal_heading_unit, current_heading_unit),
-                        -1.0,
-                        1.0,
-                    )
-                )
-                # if np.abs(angular_deflection) > ANGULAR_DEFLECTION_ABORT:
-                #     self.get_logger().info(
-                #         f"Goal aborted. Too far off course. {angular_deflection}"
-                #     )
-                #     self._goal_handle.abort()
-                #     twist = Twist()
-                #     self.publisher_.publish(twist)
-                #     result = MoveDistance.Result()
-                #     result.final_position = Point(
-                #         x=self.latest_pose.position.x,
-                #         y=self.latest_pose.position.y,
-                #         z=0.0,
-                #     )
-                #     return result
-
-                if np.abs(angular_deflection) > threshold:
-                    if threshold == START_COURSE_CORRECT_THRESHOLD:
-                        threshold = STOP_COURSE_CORRECT_THRESHOLD
-                    theta = (  # * Attenuate our corrective angular velocity by kP
-                        self.kP * angular_deflection
-                    )
-                    # * Figure out which direction to turn
-                    cross_product = np.cross(goal_heading_unit, current_heading_unit)
-                    if cross_product[2] > 0.0:
-                        theta *= -1.0
-                else:
-                    if threshold == STOP_COURSE_CORRECT_THRESHOLD:
-                        threshold = START_COURSE_CORRECT_THRESHOLD
-
-            twist.angular.z = float(theta)
-            self.publisher_.publish(twist)
+            ): # *Only turn if we're not close to the goal and sufficiently off course (to prevent over steering)
+                twist.angular.z = float(theta)
+                self.publisher_.publish(theta)
+            else:
+                self.publisher_.publish(float(0.0))
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second
                 self.get_logger().info("Feedback")
@@ -258,11 +192,10 @@ class WaypointNavActionServer(Node):
                 )
                 self._goal_handle.publish_feedback(feedback_msg)
                 tick = time.time()
-        # * endwhile
+        # * end while
 
         twist = Twist()
         self.publisher_.publish(twist)
-
 
     def check_goal_state_change(self, goal_handle):
         result = None
