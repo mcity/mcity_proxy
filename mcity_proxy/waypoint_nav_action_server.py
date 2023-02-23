@@ -94,7 +94,10 @@ class WaypointNavActionServer(Node):
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
-            self.navigate_to_target(pt)
+            result = self.navigate_to_target(pt)
+            if result is not None:
+                return result
+
 
         self._goal_handle.succeed()
         result = WaypointNav.Result()
@@ -142,7 +145,7 @@ class WaypointNavActionServer(Node):
             np.linalg.norm(current_position - self.goal_position)
             > GOAL_POSITION_TOLERANCE
         ): # *Loop until we've arrived
-            # * Make sure we haven't been cancelled or aborted
+            # *Make sure we haven't been cancelled or aborted
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
@@ -181,9 +184,9 @@ class WaypointNavActionServer(Node):
                 > COURSE_CORRECTION_CUTOFF
             ): # *Only turn if we're not close to the goal and sufficiently off course (to prevent over steering)
                 twist.angular.z = float(theta)
-                self.publisher_.publish(theta)
             else:
-                self.publisher_.publish(float(0.0))
+                twist.angular.z = float(0.0)
+            self.publisher_.publish(twist)
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second
                 self.get_logger().info("Feedback")

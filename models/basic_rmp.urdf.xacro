@@ -231,7 +231,8 @@
   <joint name="gps_joint" type="fixed">
     <parent link="base_link"/>
     <child link="gps"/>
-    <origin xyz="-.117 0.01 0.08" rpy="0 0 0"/>
+    <!-- <origin xyz="-.117 0.01 0.08" rpy="0 0 0"/> -->
+    <origin xyz="-.235 .24 .08" rpy="0 0 0" />
   </joint>
   <gazebo reference="gps">
     <material>Gazebo/Blue</material>
@@ -362,7 +363,7 @@
   </gazebo>
 
   <!-- *********************** ZED 2i SENSOR  ***************************    -->
-  <link name="camera_link">
+  <!-- <link name="camera_link">
     <visual>
       <geometry>
         <mesh filename="file://$(find mcity_proxy)/meshes/zed_2i.stl" scale="0.001 0.001 0.001"/>
@@ -373,40 +374,40 @@
       <origin xyz="-0.05 .01 0" rpy="0 0 ${pi/2}"/>
     </visual>
     <xacro:box_inertia m="0.224" w=".175" d=".3" h=".43" xyz="0 0 0" rpy="0 0 0"/>
-  </link>
+  </link> -->
 
-  <joint name="camera_joint" type="fixed">
+  <!-- <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
     <origin xyz="0.3 0 0.095" rpy="0 0 0"/>
   </joint>
-  <joint name="camera_optical_joint" type="fixed">
+  <joint name="camera_optical_joint" type="fixed"> -->
     <!-- these values have to be these values otherwise the gazebo camera
         image won't be aligned properly with the frame it is supposedly
         originating from -->
-    <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
+    <!-- <origin xyz="0 0 0" rpy="${-pi/2} 0 ${-pi/2}"/>
     <parent link="camera_link"/>
     <child link="camera_link_optical"/>
-  </joint>
+  </joint> -->
 
-  <link name="camera_link_optical">
+  <!-- <link name="camera_link_optical">
     <xacro:box_inertia m="0.01" w=".01" d=".01" h=".01" xyz="0 0 0" rpy="0 0 0"/>
-  </link>
+  </link> -->
 
-  <gazebo reference="camera_link">
-    <sensor type="depth" name="zed_2i">
+  <!-- <gazebo reference="camera_link">
+    <sensor type="depth" name="zed_2i"> -->
         <!-- Set always_on only sensor, not on plugin -->
-        <always_on>1</always_on>
+        <!-- <always_on>1</always_on> -->
 
         <!-- Set update_rate only sensor, not on plugin -->
-        <update_rate>1</update_rate>
+        <!-- <update_rate>1</update_rate>
 
         <visualize>true</visualize>
 
         <camera name="zed_2i">
-          <distortion>
+          <distortion> -->
             <!-- TODO Fix distortion params -->
-            <k1>0.1</k1>
+            <!-- <k1>0.1</k1>
             <k2>0.2</k2>
             <k3>0.3</k3>
             <p1>0.4</p1>
@@ -426,16 +427,16 @@
               <far>300</far>
             </clip>
             <noise>
-              <type>gaussian</type>
+              <type>gaussian</type> -->
               <!-- Noise is sampled independently per pixel on each frame.
                    That pixel's noise value is added to each of its color
                    channels, which at that point lie in the range [0,1]. -->
-              <mean>0.0</mean>
+              <!-- <mean>0.0</mean>
               <stddev>0.007</stddev>
             </noise>
-        </camera>
+        </camera> -->
 
-        <plugin name="zed_2i_depth_camera" filename="libgazebo_ros_camera.so">
+        <!-- <plugin name="zed_2i_depth_camera" filename="libgazebo_ros_camera.so"> -->
           <!-- Change namespace, camera name and topics so -
                 * Raw images are published to /custom_ns/custom_camera/custom_image
                 * Depth images are published to /custom_ns/custom_camera/custom_image_depth
@@ -443,31 +444,31 @@
                 * Depth image camera info is published to /custom_ns/custom_camera/custom_info_depth
                 * Point cloud is published to /custom_ns/custom_camera/custom_points
           -->
-          <ros>
-            <namespace>/</namespace>
+          <!-- <ros>
+            <namespace>/</namespace> -->
             <!-- <remapping>depth_cam/image_raw:=custom_camera/custom_image</remapping>
             <remapping>depth_cam/image_depth:=custom_camera/custom_image_depth</remapping>
             <remapping>depth_cam/camera_info:=custom_camera/custom_info_raw</remapping>
             <remapping>depth_cam/camera_info_depth:=custom_camera/custom_info_depth</remapping>
             <remapping>depth_cam/points:=custom_camera/custom_points</remapping> -->
-          </ros>
+          <!-- </ros> -->
 
           <!-- Set camera name. If empty, defaults to sensor name (i.e. "sensor_name") -->
-          <camera_name>zed_2i</camera_name>
+          <!-- <camera_name>zed_2i</camera_name> -->
 
           <!-- Set TF frame name. If empty, defaults to link name (i.e. "link_name") -->
-          <frame_name>camera_link_optical</frame_name>
+          <!-- <frame_name>camera_link_optical</frame_name> -->
 
-          <hack_baseline>0.12</hack_baseline>
+          <!-- <hack_baseline>0.12</hack_baseline> -->
 
           <!-- No need to repeat distortion parameters or to set autoDistortion -->
 
-          <min_depth>1.5</min_depth>
+          <!-- <min_depth>1.5</min_depth>
           <max_depth>35</max_depth>
       </plugin>
     </sensor>
 
-  </gazebo>
+  </gazebo> -->
 
 
   <!-- *********************** WHEEL ODOMETRY ***************************    -->

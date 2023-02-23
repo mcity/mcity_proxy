@@ -54,6 +54,13 @@ def generate_launch_description():
     ld.add_action(
         Node(
             package="mcity_proxy",
+            executable="waypoint_nav_action_server",
+            condition=IfCondition(mcity_proxy_toggle),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
             executable="proxy_control",
             condition=IfCondition(mcity_proxy_toggle),
         )
