@@ -24,6 +24,7 @@ import socketio
 import json
 import time
 import re
+import numpy as np
 
 
 class SocketComms(socketio.ClientNamespace):
@@ -32,6 +33,7 @@ class SocketComms(socketio.ClientNamespace):
     def __init__(self):
         self.api_key = os.environ.get("MCITY_OCTANE_KEY", "reticulatingsplines")
         self.id = os.environ.get("ROBOT_ID", 1)
+        self.beacon_id = os.environ.get("BEACON_ID", "MAPP0" + self.id)
         self.namespace = "/octane"
         self.channel = "robot_proxy"
         self.room = "robot"
@@ -212,6 +214,36 @@ class SocketComms(socketio.ClientNamespace):
             },
         }
         self.emit(self.channel, message)
+        # *Impersonate a Beacon for Position updates
+        heading = self.proxy_control.last_odom.pose.pose.orientation.z * 180 / np.pi
+        if heading < 0:
+            heading += 360
+        message = {
+            "id": self.beacon_id,
+            "payload": {
+                "state": {
+                    "dynamics": {
+                        "longitude": float(
+                            self.proxy_control.last_navsat_fix.longitude
+                        ),
+                        "latitude": float(self.proxy_control.last_navsat_fix.latitude),
+                        "heading": round(heading, 2),
+                        "velocity": round(np.linalg.norm(
+                            [
+                                self.proxy_control.last_odom.twist.twist.linear.x,
+                                self.proxy_control.last_odom.twist.twist.linear.y,
+                                self.proxy_control.last_odom.twist.twist.linear.z,
+                            ]
+                        ), 2),
+                        # "acceleration": 0,
+                        "elevation": self.proxy_control.last_navsat_fix.altitude,
+                        # Format is 2022-10-20T13:09:21.422Z
+                        # "updated": reading_taken_dt.isoformat(sep='T', timespec='milliseconds')
+                    }
+                }
+            },
+        }
+        self.emit("beacon_message", message, namespace="/octane")
 
 
 class ProxyControl(Node):
@@ -237,18 +269,22 @@ class ProxyControl(Node):
         self.cmd_vel_pub = self.create_publisher(Twist, "cmd_vel", 10)
 
         # *Topic Subscribers
-        self.gps_filtered_sub = self.create_subscription(
-            NavSatFix, "/gps/filtered", self.gps_filtered_callback, 10
+        self.navsat_sub = self.create_subscription(
+            NavSatFix, "/fix", self.navsat_fix_callback, 10
         )
         self.bms_fb_sub = self.create_subscription(
             BmsFb, "/bms_fb", self.bms_fb_callback, 10
+        )
+        self.odometry_filtered_sub = self.create_subscription(
+            Odometry, "/odometry/filtered", self.odometry_filtered_callback, 10
         )
 
         # *Local Data Members
         self.reset()
         self.is_running = False
         self.last_navsat_fix = NavSatFix()
-        self.last_bms_fb = None
+        self.last_bms_fb = BmsFb()
+        self.last_odom = Odometry()
 
     def reset(self):
         self.is_running = False
@@ -286,19 +322,23 @@ class ProxyControl(Node):
         )
         self.cmd_vel_pub.publish(msg)
 
-    def gps_filtered_callback(self, msg):
+    def navsat_fix_callback(self, msg):
         """
         Update our GPS position estimate (used in our state updates)
         """
         self.last_navsat_fix = msg
-        self.socket_comms.status_update()
 
     def bms_fb_callback(self, msg):
         """
         Update our battery status info (used in our state updates)
         """
         self.last_bms_fb = msg
-        self.socket_comms.status_update()
+
+    def odometry_filtered_callback(self, msg):
+        """
+        Update our odometry status info (used in beacon updates)
+        """
+        self.last_odom = msg
 
     def feedback_callback(self, feedback):
         """
@@ -332,7 +372,9 @@ class ProxyControl(Node):
         waypoints = []
         try:
             for waypoint in goal["waypoints"]:
-                waypoints.append(Waypoint(GeoPoint(waypoint[0], waypoint[1], 0), float(waypoint[2])))
+                waypoints.append(
+                    Waypoint(GeoPoint(waypoint[0], waypoint[1], 0), float(waypoint[2]))
+                )
         except:
             self.log(f"Failed to parse ${waypoints}, exiting")
             return False
@@ -405,6 +447,15 @@ def result_spin(sio, socket_comms, proxy_control):
         time.sleep(0.1)
 
 
+def status_updater(sio, socket_comms, proxy_control):
+    while True:
+        try:
+            socket_comms.status_update()
+        except Exception as e:
+            proxy_control.get_logger().debug(str(e))
+        time.sleep(0.2)  # * Update status 5 times per second
+
+
 def main(args=None):
     rclpy.init(args=args)
 
@@ -427,6 +478,11 @@ def main(args=None):
         target=result_spin, args=(sio, socket_comms, proxy_control), daemon=True
     )
     result_thread.start()
+
+    status_thread = Thread(
+        target=status_updater, args=(sio, socket_comms, proxy_control), daemon=True
+    )
+    status_thread.start()
 
     multi_exec = MultiThreadedExecutor(num_threads=8)
     multi_exec.add_node(proxy_control)

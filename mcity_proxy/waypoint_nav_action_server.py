@@ -98,7 +98,6 @@ class WaypointNavActionServer(Node):
             if result is not None:
                 return result
 
-
         self._goal_handle.succeed()
         result = WaypointNav.Result()
         result.final_position = self.point_to_lat_long(
@@ -144,7 +143,7 @@ class WaypointNavActionServer(Node):
         while (
             np.linalg.norm(current_position - self.goal_position)
             > GOAL_POSITION_TOLERANCE
-        ): # *Loop until we've arrived
+        ):  # *Loop until we've arrived
             # *Make sure we haven't been cancelled or aborted
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
@@ -182,7 +181,7 @@ class WaypointNavActionServer(Node):
             if theta > COURSE_CORRECT_THRESHOLD and (
                 np.linalg.norm(current_position - self.goal_position)
                 > COURSE_CORRECTION_CUTOFF
-            ): # *Only turn if we're not close to the goal and sufficiently off course (to prevent over steering)
+            ):  # *Only turn if we're not close to the goal and sufficiently off course (to prevent over steering)
                 twist.angular.z = float(theta)
             else:
                 twist.angular.z = float(0.0)
