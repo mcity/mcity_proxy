@@ -23,7 +23,7 @@ from threading import Thread
 COURSE_CORRECT_THRESHOLD = 0.01
 COURSE_CORRECTION_CUTOFF = 0.25
 ANGULAR_DEFLECTION_ABORT = 2 * np.pi / 3
-GOAL_POSITION_TOLERANCE = 1.0
+GOAL_POSITION_TOLERANCE = 2.0
 
 
 class WaypointNavActionServer(Node):
@@ -138,6 +138,9 @@ class WaypointNavActionServer(Node):
                 0.0,
             ]
         )
+
+        self.get_logger().info(str(current_position))
+        self.get_logger().info(str(self.goal_position))
 
         tick = time.time()
         while (

@@ -83,6 +83,10 @@ class SocketComms(socketio.ClientNamespace):
         if message_type == "estop":
             # * Emergency Stop
             return self.proxy_control.estop()
+        elif message_type == "enable":
+            return self.proxy_control.enable()
+        elif message_type == "disable":
+            return self.proxy_control.disable()
         elif message_type == "action":
             # * Action
             return self.handle_action(data)
@@ -141,13 +145,13 @@ class SocketComms(socketio.ClientNamespace):
 
     def handle_action(self, data: dict):
         self.proxy_control.log(f"Received: {data}")
+        cancel = data.get("cancel", None)
+        if cancel is not None and cancel:
+            # * Cancel current goal
+            return self.proxy_control.cancel_goal()
         action = data.get("action", None)
         if action == "move_distance" or action == "/move_distance":
             # * Move Distance Action
-            cancel = data.get("cancel", None)
-            if cancel is not None and cancel:
-                # * Cancel current goal
-                return self.proxy_control.cancel_goal()
             values = data.get("values", None)
             if values is not None:
                 # * Send a new goal
@@ -157,10 +161,6 @@ class SocketComms(socketio.ClientNamespace):
                 return "Please provide a velocity and distance"
         elif action == "waypoint_nav" or action == "/waypoint_nav":
             # * Execute Waypoint Navigation Action
-            cancel = data.get("cancel", None)
-            if cancel is not None and cancel:
-                # * Cancel current goal
-                return self.proxy_control.cancel_goal()
             values = data.get("values", None)
             if values is not None:
                 # * Send a new goal
@@ -261,8 +261,11 @@ class ProxyControl(Node):
             RosSetChassisEnableCmd, "/set_chassis_enable"
         )
 
-        self.estop_request = RosSetChassisEnableCmd.Request(
+        self.disable_request = RosSetChassisEnableCmd.Request(
             ros_set_chassis_enable_cmd=False
+        )
+        self.enable_request = RosSetChassisEnableCmd.Request(
+            ros_set_chassis_enable_cmd=True
         )
 
         # *Topic Publishers
@@ -303,10 +306,22 @@ class ProxyControl(Node):
         """
         Immediately disable the robot
         """
-        future = self.proxy_enable_service(self.estop_request)
-        rclpy.spin_until_future_complete(self, future)
+        self.cmd_vel_pub.publish(Twist())
+        self.proxy_enable_service.call(self.disable_request)
         self.reset()
-        return future.result()
+        return True
+
+    def enable(self):
+        """
+        Enable the Segway RMP
+        """
+        return self.proxy_enable_service.call(self.enable_request)
+
+    def disable(self):
+        """
+        Disable the Segway RMP
+        """
+        return self.proxy_enable_service.call(self.disable_request)
 
     def is_disabled(self):
         # TODO
@@ -370,14 +385,10 @@ class ProxyControl(Node):
         goal = values.get("waypoint_nav_goal", None)
         self.ac_waypoint_nav.wait_for_server()
         waypoints = []
-        try:
-            for waypoint in goal["waypoints"]:
-                waypoints.append(
-                    Waypoint(GeoPoint(waypoint[0], waypoint[1], 0), float(waypoint[2]))
-                )
-        except:
-            self.log(f"Failed to parse ${waypoints}, exiting")
-            return False
+        for waypoint in goal["waypoints"]:
+            waypoints.append(
+                Waypoint(lat_long=GeoPoint(latitude=waypoint['latitude'], longitude=waypoint['longitude'], altitude=0.0), velocity=float(waypoint['meters_per_second']))
+            )
         self.send_goal_future_waypoint_nav = self.ac_waypoint_nav.send_goal_async(
             WaypointNav.Goal(waypoints=waypoints),
             feedback_callback=self.feedback_callback,
@@ -411,6 +422,7 @@ class ProxyControl(Node):
         Called when we complete a goal
         """
         result = future.result().result
+        self.get_logger().info("Sending goal result.")
         self.socket_comms.send_ros_message("goal_result", result)
         self.reset()
 

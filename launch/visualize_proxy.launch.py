@@ -8,7 +8,6 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-
     # Set the path to different files and folders.
     pkg_share = FindPackageShare(package="mcity_proxy").find("mcity_proxy")
     default_launch_dir = os.path.join(pkg_share, "launch")
