@@ -32,6 +32,7 @@ setup(
         "console_scripts": [
             "cmd_vel_spin = mcity_proxy.cmd_vel_spin:main",
             "move_distance_action_server = mcity_proxy.move_distance_action_server:main",
+            "move_circle_action_server = mcity_proxy.move_circle_action_server:main",
             "waypoint_nav_action_server = mcity_proxy.waypoint_nav_action_server:main",
             "proxy_control = mcity_proxy.proxy_control:main",
         ],

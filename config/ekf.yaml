@@ -79,7 +79,7 @@ ekf_filter_node:
 # sensor_msgs/Imu). To add an input, simply append the next number in the sequence to its "base" name, e.g., odom0,
 # odom1, twist0, twist1, imu0, imu1, imu2, etc. The value should be the topic name. These parameters obviously have no
 # default values, and must be specified.
-        odom0: odometry/wheel
+        odom0: /odometry/wheel
 
 # Each sensor reading updates some or all of the filter's state. These options give you greater control over which
 # values from each measurement are fed to the filter. For example, if you have an odometry message as input, but only
@@ -151,12 +151,32 @@ ekf_filter_node:
         #              true, true, true]
         #odom2_differential: false
 
-        imu0: imu/filter/data
+        imu0: /imu
         imu0_config: [false, false, false,
-                     true,  true,  true,
+                     false,  false,  false,
                      false, false, false,
-                     true,  true,  true,
+                     false,  false,  true,
                      true,  true,  true]
+
+        imu0_remove_gravitational_acceleration: true
+
+        imu1: /esf/imu
+        imu1_config: [false, false, false,
+                     false,  false,  false,
+                     false, false, false,
+                     false,  false,  true,
+                     true,  true,  true]
+
+        imu1_remove_gravitational_acceleration: true
+
+        imu2: /heading
+        imu2_config: [false, false, false,
+                     false,  false,  true,
+                     false, false, false,
+                     false,  false,  false,
+                     false,  false,  false]
+
+        imu2_remove_gravitational_acceleration: false
 
         #        [x_pos   , y_pos    , z_pos,
         #         roll    , pitch    , yaw,
@@ -174,7 +194,6 @@ ekf_filter_node:
 
 # [ADVANCED] Some IMUs automatically remove acceleration due to gravity, and others don't. If yours doesn't, please set
 # this to true, and *make sure* your data conforms to REP-103, specifically, that the data is in ENU frame.
-        imu0_remove_gravitational_acceleration: true
 
 # [ADVANCED]  The EKF and UKF models follow a standard predict/correct cycle. During prediction, if there is no
 # acceleration reference, the velocity at time t+1 is simply predicted to be the same as the velocity at time t. During

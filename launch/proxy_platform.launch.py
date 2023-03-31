@@ -4,6 +4,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
     IncludeLaunchDescription,
+    GroupAction
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import (
@@ -16,7 +17,7 @@ from launch.substitutions import (
     PythonExpression,
     FindExecutable,
 )
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetRemap
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
 
@@ -104,6 +105,14 @@ def generate_launch_description():
             condition=IfCondition(ublox_toggle),
         )
     )
+    ld.add_action(
+        Node(
+            package="rmc_to_imu",
+            executable="rmc_to_imu",
+            name="rmc_to_imu",
+            condition=IfCondition(ublox_toggle)
+        )
+    )
 
     ntrip_toggle = LaunchConfiguration("ntrip_toggle")
     ntrip_toggle_arg = DeclareLaunchArgument(
@@ -149,19 +158,29 @@ def generate_launch_description():
     ld.add_action(ntrip_password_arg)
     # Launch NTRIP Client
     ld.add_action(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(pkg_share, "ntrip_client.launch.py")
-            ),
-            launch_arguments={
-                "host": ntrip_host,
-                "port": ntrip_port,
-                "mountpoint": ntrip_mountpoint,
-                "username": ntrip_username,
-                "password": ntrip_password,
-                "rtcm_message_package": "rtcm_msgs",
-            }.items(),
-            condition=IfCondition(ntrip_toggle),
+        GroupAction(
+            actions=[
+                SetRemap(src='nmea', dst='/ntrip/nmea'),
+                IncludeLaunchDescription(
+                    PythonLaunchDescriptionSource(
+                        os.path.join(pkg_share, "ntrip_client.launch.py")
+                    ),
+                    launch_arguments={
+                        "host": ntrip_host,
+                        "port": ntrip_port,
+                        "mountpoint": ntrip_mountpoint,
+                        "username": ntrip_username,
+                        "password": ntrip_password,
+                        "rtcm_message_package": "rtcm_msgs",
+                    }.items(),
+                    condition=IfCondition(ntrip_toggle)
+                ),
+                Node(
+                    package="fix2nmea",
+                    executable="fix2nmea",
+                    name="fix2nmea"
+                )
+            ]
         )
     )
 
@@ -176,14 +195,14 @@ def generate_launch_description():
             output="screen",
             remappings=[
                 ("/gps/fix", "/fix"),
-                ("/imu/data", "/imu/data/filter"),
+                ("/imu/data", "/heading"),
             ],
             parameters=[
                 {
                     # "magnetic_declination_radians": -0.1233366,
                     # "yaw_offset": 1.5707963,
                     "zero_altitude": True,
-                    "broadcast_utm_transform": True,
+                    "broadcast_cartesian_transform": True,
                 }
             ],
             condition=IfCondition(ublox_toggle),
@@ -399,7 +418,7 @@ def generate_launch_description():
     zed_toggle = LaunchConfiguration("zed_toggle")
     zed_toggle_arg = DeclareLaunchArgument(
        name="zed_toggle",
-       default_value="True",
+       default_value="False",
        description="Determines whether or not to start the ZED 2i ROS wrapper.",
     )
     ld.add_action(zed_toggle_arg)
@@ -465,22 +484,22 @@ def generate_launch_description():
     #        condition=IfCondition(zed_toggle),
     #    )
     # )
-    ld.add_action(
-        Node(
-            package="imu_filter_madgwick",
-            executable="imu_filter_madgwick_node",
-            name="imu_filter",
-            output="screen",
-            parameters=[
-                os.path.join(pkg_share, "config/imu_filter.yaml")
-            ],
-            remappings=[
-                ("imu/data_raw", "/zed2i/zed_node/imu/data_raw"),
-                ("imu/mag", "/zed2i/zed_node/imu/mag"),
-                ("imu/data", "imu/filter/data")
-            ]
-        )
-    )
+    # ld.add_action(
+    #     Node(
+    #         package="imu_filter_madgwick",
+    #         executable="imu_filter_madgwick_node",
+    #         name="imu_filter",
+    #         output="screen",
+    #         parameters=[
+    #             os.path.join(pkg_share, "config/imu_filter.yaml")
+    #         ],
+    #         remappings=[
+    #             ("imu/data_raw", "/zed2i/zed_node/imu/data_raw"),
+    #             ("imu/mag", "/zed2i/zed_node/imu/mag"),
+    #             ("imu/data", "imu/filter/data")
+    #         ]
+    #     )
+    # )
 
     # * Segway RMP *
     segway_toggle = LaunchConfiguration("segway_toggle")
