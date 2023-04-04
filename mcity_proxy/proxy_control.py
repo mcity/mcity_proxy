@@ -6,7 +6,7 @@ from rclpy.action import ActionClient
 from std_msgs.msg import String
 from geometry_msgs.msg import Twist, Vector3
 from nav_msgs.msg import Odometry
-from mcity_proxy_msgs.action import MoveDistance, WaypointNav
+from mcity_proxy_msgs.action import MoveDistance, MoveCircle, WaypointNav
 from mcity_proxy_msgs.msg import Waypoint
 from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallbackGroup
 from segway_msgs.srv import RosSetChassisEnableCmd
@@ -159,6 +159,15 @@ class SocketComms(socketio.ClientNamespace):
             else:
                 self.proxy_control.log("No values provided.")
                 return "Please provide a velocity and distance"
+        elif action == "move_circle" or action == "/move_circle":
+            # * Move Distance Action
+            values = data.get("values", None)
+            if values is not None:
+                # * Send a new goal
+                return self.proxy_control.move_circle_send_goal(values)
+            else:
+                self.proxy_control.log("No values provided.")
+                return "Please provide a velocity and distance"
         elif action == "waypoint_nav" or action == "/waypoint_nav":
             # * Execute Waypoint Navigation Action
             values = data.get("values", None)
@@ -228,13 +237,16 @@ class SocketComms(socketio.ClientNamespace):
                         ),
                         "latitude": float(self.proxy_control.last_navsat_fix.latitude),
                         "heading": round(heading, 2),
-                        "velocity": round(np.linalg.norm(
-                            [
-                                self.proxy_control.last_odom.twist.twist.linear.x,
-                                self.proxy_control.last_odom.twist.twist.linear.y,
-                                self.proxy_control.last_odom.twist.twist.linear.z,
-                            ]
-                        ), 2),
+                        "velocity": round(
+                            np.linalg.norm(
+                                [
+                                    self.proxy_control.last_odom.twist.twist.linear.x,
+                                    self.proxy_control.last_odom.twist.twist.linear.y,
+                                    self.proxy_control.last_odom.twist.twist.linear.z,
+                                ]
+                            ),
+                            2,
+                        ),
                         # "acceleration": 0,
                         "elevation": self.proxy_control.last_navsat_fix.altitude,
                         # Format is 2022-10-20T13:09:21.422Z
@@ -254,6 +266,7 @@ class ProxyControl(Node):
 
         # *Action Clients
         self.ac_move_distance = ActionClient(self, MoveDistance, "move_distance")
+        self.ac_move_circle = ActionClient(self, MoveCircle, "move_circle")
         self.ac_waypoint_nav = ActionClient(self, WaypointNav, "waypoint_nav")
 
         # *Services
@@ -293,6 +306,7 @@ class ProxyControl(Node):
         self.is_running = False
         self.goal_handle = None
         self.send_goal_future_move_distance = None
+        self.send_goal_future_move_circle = None
         self.send_goal_future_waypoint_nav = None
         self.cancel_move_distance_goal = None
         self.cancel_waypoint_nav_goal = None
@@ -377,6 +391,23 @@ class ProxyControl(Node):
         )
         self.send_goal_future_move_distance.add_done_callback(self.response_callback)
 
+    def move_circle_send_goal(self, values):
+        """
+        Handle a new MoveCircle goal from the server
+        """
+        self.is_running = True
+        goal = values["move_circle_goal"]
+        self.ac_move_circle.wait_for_server()
+        self.send_goal_future_move_circle = self.ac_move_circle.send_goal_async(
+            MoveCircle.Goal(
+                meters_per_second=float(goal["meters_per_second"]),
+                radius=float(goal["radius"]),
+                seconds=float(goal["seconds"]),
+            ),
+            feedback_callback=self.feedback_callback,
+        )
+        self.send_goal_future_move_circle.add_done_callback(self.response_callback)
+
     def waypoint_nav_send_goal(self, values):
         """
         Handle a new WaypointNav goal from the server
@@ -387,7 +418,14 @@ class ProxyControl(Node):
         waypoints = []
         for waypoint in goal["waypoints"]:
             waypoints.append(
-                Waypoint(lat_long=GeoPoint(latitude=waypoint['latitude'], longitude=waypoint['longitude'], altitude=0.0), velocity=float(waypoint['meters_per_second']))
+                Waypoint(
+                    lat_long=GeoPoint(
+                        latitude=waypoint["latitude"],
+                        longitude=waypoint["longitude"],
+                        altitude=0.0,
+                    ),
+                    velocity=float(waypoint["meters_per_second"]),
+                )
             )
         self.send_goal_future_waypoint_nav = self.ac_waypoint_nav.send_goal_async(
             WaypointNav.Goal(waypoints=waypoints),

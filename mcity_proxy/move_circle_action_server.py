@@ -17,6 +17,7 @@ import copy
 import numpy as np
 from threading import Thread
 
+
 class MoveCircleActionServer(Node):
     def __init__(self):
         super().__init__("move_circle_action_server")
@@ -82,12 +83,20 @@ class MoveCircleActionServer(Node):
         start_time = time.time()
         feedback_msg = MoveCircle.Feedback()
         tick = start_time
-        while(time.time() - start_time < goal_handle.request.seconds):
+        r = goal_handle.request.radius
+        ms = goal_handle.request.meters_per_second
+        c = 2 * np.pi * r
+        angular_velocity = 2 * np.pi * (ms / c)
+        while time.time() - start_time < goal_handle.request.seconds:
             result = self.check_goal_state_change(goal_handle)
             if result is not None:
                 return result
-            twist = Twist(linear=Vector3(x=goal_handle.request.radius * goal_handle.request.meters_per_second),
-            angular=Vector3(z=goal_handle.request.meters_per_second))
+            twist = Twist(
+                linear=Vector3(
+                    x=ms
+                ),
+                angular=Vector3(z=angular_velocity),
+            )
             self.publisher_.publish(twist)
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second

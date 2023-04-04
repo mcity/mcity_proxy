@@ -4,7 +4,7 @@ from launch.actions import (
     DeclareLaunchArgument,
     ExecuteProcess,
     IncludeLaunchDescription,
-    GroupAction
+    GroupAction,
 )
 from launch.conditions import IfCondition, UnlessCondition
 from launch.launch_description_sources import (
@@ -49,6 +49,13 @@ def generate_launch_description():
         Node(
             package="mcity_proxy",
             executable="move_distance_action_server",
+            condition=IfCondition(mcity_proxy_toggle),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
+            executable="move_circle_action_server",
             condition=IfCondition(mcity_proxy_toggle),
         )
     )
@@ -110,7 +117,7 @@ def generate_launch_description():
             package="rmc_to_imu",
             executable="rmc_to_imu",
             name="rmc_to_imu",
-            condition=IfCondition(ublox_toggle)
+            condition=IfCondition(ublox_toggle),
         )
     )
 
@@ -160,7 +167,7 @@ def generate_launch_description():
     ld.add_action(
         GroupAction(
             actions=[
-                SetRemap(src='nmea', dst='/ntrip/nmea'),
+                SetRemap(src="nmea", dst="/ntrip/nmea"),
                 IncludeLaunchDescription(
                     PythonLaunchDescriptionSource(
                         os.path.join(pkg_share, "ntrip_client.launch.py")
@@ -173,13 +180,9 @@ def generate_launch_description():
                         "password": ntrip_password,
                         "rtcm_message_package": "rtcm_msgs",
                     }.items(),
-                    condition=IfCondition(ntrip_toggle)
+                    condition=IfCondition(ntrip_toggle),
                 ),
-                Node(
-                    package="fix2nmea",
-                    executable="fix2nmea",
-                    name="fix2nmea"
-                )
+                Node(package="fix2nmea", executable="fix2nmea", name="fix2nmea"),
             ]
         )
     )
@@ -203,6 +206,8 @@ def generate_launch_description():
                     # "yaw_offset": 1.5707963,
                     "zero_altitude": True,
                     "broadcast_cartesian_transform": True,
+                    # "frequency": 2.0,
+                    # "delay": 60.0,
                 }
             ],
             condition=IfCondition(ublox_toggle),
@@ -417,57 +422,57 @@ def generate_launch_description():
     zed_launch_dir = os.path.join(zed_dir, "launch")
     zed_toggle = LaunchConfiguration("zed_toggle")
     zed_toggle_arg = DeclareLaunchArgument(
-       name="zed_toggle",
-       default_value="False",
-       description="Determines whether or not to start the ZED 2i ROS wrapper.",
+        name="zed_toggle",
+        default_value="False",
+        description="Determines whether or not to start the ZED 2i ROS wrapper.",
     )
     ld.add_action(zed_toggle_arg)
     svo_path = LaunchConfiguration("svo_path")
     svo_path_arg = DeclareLaunchArgument(
-       "svo_path",
-       default_value="live",  # 'live' used as patch for launch files not allowing empty strings as default parameters
-       description="Path to an input SVO file. Note: overrides the parameter `general.svo_file` in `common.yaml`.",
+        "svo_path",
+        default_value="live",  # 'live' used as patch for launch files not allowing empty strings as default parameters
+        description="Path to an input SVO file. Note: overrides the parameter `general.svo_file` in `common.yaml`.",
     )
     ld.add_action(svo_path_arg)
 
     # ZED Wrapper node
     ld.add_action(
-       IncludeLaunchDescription(
-           launch_description_source=PythonLaunchDescriptionSource(
-               [
-                   get_package_share_directory("zed_wrapper"),
-                   "/launch/include/zed_camera.launch.py",
-               ]
-           ),
-           condition=IfCondition(zed_toggle),
-           launch_arguments={
-               "camera_model": "zed2i",
-               "camera_name": "zed2i",
-               "node_name": "zed_node",
-               "config_common_path": os.path.join(
-                   get_package_share_directory("zed_wrapper"), "config", "common.yaml"
-               ),
-               "config_camera_path": os.path.join(
-                   get_package_share_directory("zed_wrapper"),
-                   "config",
-                   "zed2i.yaml",
-               ),
-               "publish_urdf": "true",
-               "xacro_path": os.path.join(
-                   get_package_share_directory("zed_wrapper"),
-                   "urdf",
-                   "zed_descr.urdf.xacro",
-               ),
-               "svo_path": svo_path,
-               "base_frame": "base_footprint",
-               "cam_pos_x": "0.3",
-               "cam_pos_y": "0.0",
-               "cam_pos_z": "0.2525",
-               "cam_roll": "0.0",
-               "cam_pitch": "0.0",
-               "cam_yaw": "0.0",
-           }.items(),
-       )
+        IncludeLaunchDescription(
+            launch_description_source=PythonLaunchDescriptionSource(
+                [
+                    get_package_share_directory("zed_wrapper"),
+                    "/launch/include/zed_camera.launch.py",
+                ]
+            ),
+            condition=IfCondition(zed_toggle),
+            launch_arguments={
+                "camera_model": "zed2i",
+                "camera_name": "zed2i",
+                "node_name": "zed_node",
+                "config_common_path": os.path.join(
+                    get_package_share_directory("zed_wrapper"), "config", "common.yaml"
+                ),
+                "config_camera_path": os.path.join(
+                    get_package_share_directory("zed_wrapper"),
+                    "config",
+                    "zed2i.yaml",
+                ),
+                "publish_urdf": "true",
+                "xacro_path": os.path.join(
+                    get_package_share_directory("zed_wrapper"),
+                    "urdf",
+                    "zed_descr.urdf.xacro",
+                ),
+                "svo_path": svo_path,
+                "base_frame": "base_footprint",
+                "cam_pos_x": "0.3",
+                "cam_pos_y": "0.0",
+                "cam_pos_z": "0.2525",
+                "cam_roll": "0.0",
+                "cam_pitch": "0.0",
+                "cam_yaw": "0.0",
+            }.items(),
+        )
     )
     # Pull a laserscan from the ZED Camera
     # ld.add_action(
