@@ -503,7 +503,7 @@ def status_updater(sio, socket_comms, proxy_control):
             socket_comms.status_update()
         except Exception as e:
             proxy_control.get_logger().debug(str(e))
-        time.sleep(0.2)  # * Update status 5 times per second
+        time.sleep(1.0)  # * Update status once per second
 
 
 def main(args=None):

@@ -8,6 +8,7 @@ from std_msgs.msg import String
 from geometry_msgs.msg import Twist, Point, Pose, Quaternion, Vector3
 from nav_msgs.msg import Odometry
 from mcity_proxy_msgs.action import WaypointNav
+from mcity_proxy_msgs.msg import Heading
 from rclpy.callback_groups import ReentrantCallbackGroup
 from tf_transformations import euler_from_quaternion
 from robot_localization.srv import FromLL, ToLL
@@ -22,8 +23,11 @@ from threading import Thread
 
 COURSE_CORRECT_THRESHOLD = 0.01
 COURSE_CORRECTION_CUTOFF = 0.25
-ANGULAR_DEFLECTION_ABORT = 2 * np.pi / 3
-GOAL_POSITION_TOLERANCE = 2.0
+ANGULAR_error_ABORT = 2 * np.pi / 3
+GOAL_POSITION_TOLERANCE = 1.0
+KP = 0.2
+KI = 0.004
+KD = 3.0
 
 
 class WaypointNavActionServer(Node):
@@ -32,8 +36,9 @@ class WaypointNavActionServer(Node):
         self.publisher_ = self.create_publisher(Twist, "cmd_vel", 10)
         self._goal_handle = None
         self._goal_lock = threading.Lock()
-        self.goal_position = np.array([0.0, 0.0, 0.0])
-        self.latest_pose = None
+        self.goal_position = np.array([0.0, 0.0])
+        self.latest_position = np.array([0.0, 0.0])
+        self.latest_heading = 0.0
         self.kP = 0.5
         self.callback_group = ReentrantCallbackGroup()
 
@@ -49,22 +54,49 @@ class WaypointNavActionServer(Node):
         )
 
         # *Subscriptions and Publishers
-        self.odom_subscriber_ = self.create_subscription(
-            Odometry,
-            "/odometry/filtered",
-            self.odom_callback,
+        self.heading_subscriber = self.create_subscription(
+            Heading,
+            "/heading",
+            self.heading_callback,
             10,
             callback_group=self.callback_group,
         )
-        self.to_ll_service_ = self.create_client(ToLL, "/toLL")
-        self.from_ll_service_ = self.create_client(FromLL, "/fromLL")
+        # self.odom_subscriber = self.create_subscription(
+        #     Odometry,
+        #     "/odometry/global",
+        #     self.odom_callback,
+        #     10,
+        #     callback_group=self.callback_group,
+        # )
+        self.fix_subscriber = self.create_subscription(
+            NavSatFix,
+            "/fix",
+            self.fix_callback,
+            10,
+            callback_group=self.callback_group,
+        )
 
     def destroy(self):
         self._action_server.destroy()
         super().destroy_node()
 
+    def heading_callback(self, msg):
+        self.latest_heading = float(msg.heading)
+
     def odom_callback(self, msg):
-        self.latest_pose = copy.deepcopy(msg.pose.pose)
+        self.latest_heading = float(
+            euler_from_quaternion(
+                [
+                    msg.pose.pose.orientation.x,
+                    msg.pose.pose.orientation.y,
+                    msg.pose.pose.orientation.z,
+                    msg.pose.pose.orientation.w,
+                ]
+            )[2]
+        )
+
+    def fix_callback(self, msg):
+        self.latest_position = np.array([msg.latitude, msg.longitude])
 
     def goal_callback(self, goal_request):
         self.get_logger().info("WaypointNav Action Server: Received Goal")
@@ -78,7 +110,6 @@ class WaypointNavActionServer(Node):
                 # Abort the existing goal
                 self._goal_handle.abort()
             self._goal_handle = goal_handle
-
         goal_handle.execute()
 
     def cancel_callback(self, goal):
@@ -98,53 +129,33 @@ class WaypointNavActionServer(Node):
             if result is not None:
                 return result
 
+        # *Stop ourselves
+        twist = Twist()
+        self.publisher_.publish(twist)
+
         self._goal_handle.succeed()
         result = WaypointNav.Result()
-        result.final_position = self.point_to_lat_long(
-            x=self.latest_pose.position.x, y=self.latest_pose.position.y
+        result.final_position = GeoPoint(
+            latitude=self.latest_position[0], longitude=self.latest_position[1]
         )
         return result
 
-    def point_to_lat_long(self, x, y):
-        self.future = self.to_ll_service_.call_async(
-            ToLL.Request(map_point=Point(x=float(x), y=float(y), z=0.0))
-        )
-        rclpy.spin_until_future_complete(self, self.future)
-        lat_long = self.future.result().ll_point
-        return GeoPoint(
-            latitude=lat_long.latitude, longitude=lat_long.longitude, altitude=0.0
-        )
-
-    def lat_long_to_point(self, lat_long):
-        self.future = self.from_ll_service_.call_async(
-            FromLL.Request(ll_point=lat_long)
-        )
-        rclpy.spin_until_future_complete(self, self.future)
-        point = self.future.result().map_point
-        return np.array([point.x, point.y, 0])
-
     def navigate_to_target(self, waypoint):
-        self.goal_position = self.lat_long_to_point(waypoint.lat_long)
+        self.goal_position = np.array(
+            [waypoint.lat_long.latitude, waypoint.lat_long.longitude]
+        )
 
         # * Capture our initial state and extrapolate goal information
         twist = Twist(linear=Vector3(x=waypoint.velocity))
         self.publisher_.publish(twist)
         feedback_msg = WaypointNav.Feedback()
 
-        current_position = np.array(
-            [
-                self.latest_pose.position.x,
-                self.latest_pose.position.y,
-                0.0,
-            ]
-        )
-
-        self.get_logger().info(str(current_position))
-        self.get_logger().info(str(self.goal_position))
-
         tick = time.time()
+        last_error  = 0.0
+        integral = 0.0
+        dt = time.time()
         while (
-            np.linalg.norm(current_position - self.goal_position)
+            self.distance(self.latest_position, self.goal_position)
             > GOAL_POSITION_TOLERANCE
         ):  # *Loop until we've arrived
             # *Make sure we haven't been cancelled or aborted
@@ -153,54 +164,79 @@ class WaypointNavActionServer(Node):
                 return result
 
             # *Update Current Position and Orientation
-            current_position = np.array(
-                [
-                    self.latest_pose.position.x,
-                    self.latest_pose.position.y,
-                    0.0,
-                ]
-            )
-            yaw = euler_from_quaternion(
-                [
-                    self.latest_pose.orientation.x,
-                    self.latest_pose.orientation.y,
-                    self.latest_pose.orientation.z,
-                    self.latest_pose.orientation.w,
-                ]
-            )[2]
-
-            # *Calculate how much we need to turn to correct our heading (multiply by 2 to make it faster)
-            theta = float(
-                2
-                * (
-                    np.arctan2(
-                        self.goal_position[1] - current_position[1],
-                        self.goal_position[0] - current_position[0],
-                    )
-                    - yaw
-                )
+            goal_bearing = self.calc_bearing(
+                self.latest_position,
+                self.goal_position,
             )
 
-            if theta > COURSE_CORRECT_THRESHOLD and (
-                np.linalg.norm(current_position - self.goal_position)
-                > COURSE_CORRECTION_CUTOFF
-            ):  # *Only turn if we're not close to the goal and sufficiently off course (to prevent over steering)
-                twist.angular.z = float(theta)
-            else:
-                twist.angular.z = float(0.0)
+            # *PID Controller
+            error = float(goal_bearing - self.latest_heading)
+            while error > np.pi:
+                error -= 2.0 * np.pi
+            while error < -1.0 * np.pi:
+                error += 2.0 * np.pi
+            dt = time.time() - dt
+            integral += error * dt
+            derivative = (error - self.last_error) / dt
+            theta = KP * error + KI * integral + KD * derivative
+            last_error = error
+            twist.angular.z = float(theta)
             self.publisher_.publish(twist)
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second
                 self.get_logger().info("Feedback")
-                feedback_msg.current_position = self.point_to_lat_long(
-                    x=self.latest_pose.position.x, y=self.latest_pose.position.y
+                feedback_msg.current_position = GeoPoint(
+                    latitude=self.latest_position[0], longitude=self.latest_position[1]
+                )
+                feedback_msg.distance_to_goal = self.distance(
+                    self.latest_position, self.goal_position
                 )
                 self._goal_handle.publish_feedback(feedback_msg)
                 tick = time.time()
         # * end while
 
-        twist = Twist()
-        self.publisher_.publish(twist)
+        return None
+
+    def calc_bearing(self, p1, p2):
+        # *Convert latitude and longitude to radians
+        lat1 = math.radians(p1[0])
+        long1 = math.radians(p1[1])
+        lat2 = math.radians(p2[0])
+        long2 = math.radians(p2[1])
+
+        # *Calculate the bearing in Radians NED
+        bearing = np.arctan2(
+            np.sin(long2 - long1) * np.cos(lat2),
+            np.cos(lat1) * np.sin(lat2)
+            - np.sin(lat1) * np.cos(lat2) * np.cos(long2 - long1),
+        )
+
+        enu_bearing = (
+            -1 * bearing
+        ) + (np.pi / 2.0)  # *Return in ENU i.e. positive is counter-clockwise, 0 is east
+
+        while enu_bearing > 2.0 * np.pi:
+            enu_bearing -= 2.0 * np.pi
+        while enu_bearing < 0.0:
+            enu_bearing += 2.0 * np.pi
+
+        return enu_bearing
+
+
+    def distance(self, p1, p2):
+        """
+        * Returns the distance between two (lat, long) points, measured in meters
+        """
+        lat1 = math.radians(p1[0])
+        long1 = math.radians(p1[1])
+        lat2 = math.radians(p2[0])
+        long2 = math.radians(p2[1])
+        dLat = lat2 - lat1
+        dLon = long2 - long1
+        a = np.sin(dLat / 2) * np.sin(dLat / 2) + np.cos(lat1) * np.cos(lat2) * np.sin(
+            dLon / 2
+        ) * np.sin(dLon / 2)
+        return np.abs(12756274 * np.arctan2(np.sqrt(a), np.sqrt(1 - a)))
 
     def check_goal_state_change(self, goal_handle):
         result = None
@@ -208,8 +244,8 @@ class WaypointNavActionServer(Node):
             # *Another goal was set: abort, and return the current position
             self.get_logger().info("Goal aborted.")
             result = WaypointNav.Result()
-            result.final_position = self.point_to_lat_long(
-                x=self.latest_pose.position.x, y=self.latest_pose.position.y
+            result.final_position = GeoPoint(
+                latitude=self.latest_position[0], longitude=self.latest_position[1]
             )
         if goal_handle.is_cancel_requested:
             # *Goal was canceled, stop the robot and return the current position
@@ -218,8 +254,8 @@ class WaypointNavActionServer(Node):
             twist = Twist()
             self.publisher_.publish(twist)
             result = WaypointNav.Result()
-            result.final_position = self.point_to_lat_long(
-                x=self.latest_pose.position.x, y=self.latest_pose.position.y
+            result.final_position = GeoPoint(
+                latitude=self.latest_position[0], longitude=self.latest_position[1]
             )
 
         return result

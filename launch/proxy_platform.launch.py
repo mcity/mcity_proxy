@@ -188,40 +188,60 @@ def generate_launch_description():
     )
 
     # * ROBOT LOCALIZATION *
-    robot_localization_file_path = os.path.join(pkg_share, "config/ekf.yaml")
-    # Start the navsat_tranform_node to convert our RTK fix to local frame
+    robot_localization_file_path = os.path.join(
+        pkg_share, "params/dual_ekf_navsat.yaml"
+    )
+    robot_localization_toggle = LaunchConfiguration("robot_localization_toggle")
+    robot_localization_toggle_arg = DeclareLaunchArgument(
+        name="robot_localization_toggle",
+        default_value="False",
+        description="Determines whether or not to start the EKF and Navsat Transform.",
+    )
+    ld.add_action(robot_localization_toggle_arg)
+    # *Start the navsat_tranform_node to convert our RTK fix to local frame
     ld.add_action(
         Node(
             package="robot_localization",
             executable="navsat_transform_node",
             name="navsat_transform_node",
             output="screen",
+            # remappings=[
+            #     ("/gps/fix", "/fix"),
+            #     ("/imu", "/heading"),
+            # ],
             remappings=[
-                ("/gps/fix", "/fix"),
-                ("/imu/data", "/heading"),
+                ("imu/data", "/heading"),
+                ("gps/fix", "/fix"),
+                ("gps/filtered", "gps/filtered"),
+                ("odometry/gps", "odometry/gps"),
+                ("odometry/filtered", "odometry/global"),
             ],
-            parameters=[
-                {
-                    # "magnetic_declination_radians": -0.1233366,
-                    # "yaw_offset": 1.5707963,
-                    "zero_altitude": True,
-                    "broadcast_cartesian_transform": True,
-                    # "frequency": 2.0,
-                    # "delay": 60.0,
-                }
-            ],
-            condition=IfCondition(ublox_toggle),
+            parameters=[robot_localization_file_path],
+            condition=IfCondition(robot_localization_toggle),
         )
     )
-    # Start robot localization using an Extended Kalman filter
+    # *Start dual Extended Kalman Filters to do local and global positioning
     ld.add_action(
         Node(
             package="robot_localization",
             executable="ekf_node",
-            name="ekf_filter_node",
+            name="ekf_filter_node_odom",
             output="screen",
             parameters=[robot_localization_file_path],
+            remappings=[("odometry/filtered", "odometry/local")],
+            condition=IfCondition(robot_localization_toggle),
         )
+    )
+    ld.add_action(
+        Node(
+            package="robot_localization",
+            executable="ekf_node",
+            name="ekf_filter_node_map",
+            output="screen",
+            parameters=[robot_localization_file_path],
+            remappings=[("odometry/filtered", "odometry/global")],
+            condition=IfCondition(robot_localization_toggle),
+        ),
     )
 
     # * RVIZ *
@@ -278,7 +298,7 @@ def generate_launch_description():
     joint_state_toggle = LaunchConfiguration("joint_state_toggle")
     joint_state_toggle_arg = DeclareLaunchArgument(
         name="joint_state_toggle",
-        default_value="True",
+        default_value="False",
         description="Flag to enable joint_state_publisher_gui",
     )
     ld.add_action(joint_state_toggle_arg)
@@ -516,7 +536,7 @@ def generate_launch_description():
     segway_enable = LaunchConfiguration("segway_enable")
     segway_enable_arg = DeclareLaunchArgument(
         name="segway_enable",
-        default_value="True",
+        default_value="False",
         description="Determines whether or not to enable the Segway RMP.",
     )
     ld.add_action(segway_toggle_arg)

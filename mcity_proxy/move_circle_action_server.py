@@ -92,9 +92,7 @@ class MoveCircleActionServer(Node):
             if result is not None:
                 return result
             twist = Twist(
-                linear=Vector3(
-                    x=ms
-                ),
+                linear=Vector3(x=ms),
                 angular=Vector3(z=angular_velocity),
             )
             self.publisher_.publish(twist)
