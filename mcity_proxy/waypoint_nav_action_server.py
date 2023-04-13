@@ -23,10 +23,11 @@ from threading import Thread
 
 COURSE_CORRECT_THRESHOLD = 0.01
 COURSE_CORRECTION_CUTOFF = 0.25
-ANGULAR_error_ABORT = 2 * np.pi / 3
-GOAL_POSITION_TOLERANCE = 1.0
-KP = 0.2
-KI = 0.004
+ANGULAR_ERROR_ABORT = 2 * np.pi / 3
+GOAL_POSITION_TOLERANCE = 0.5
+KP = 0.5
+# KI = 0.004
+KI = 0.0
 KD = 3.0
 
 
@@ -177,7 +178,7 @@ class WaypointNavActionServer(Node):
                 error += 2.0 * np.pi
             dt = time.time() - dt
             integral += error * dt
-            derivative = (error - self.last_error) / dt
+            derivative = (error - last_error) / dt
             theta = KP * error + KI * integral + KD * derivative
             last_error = error
             twist.angular.z = float(theta)
