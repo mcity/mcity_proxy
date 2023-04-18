@@ -24,12 +24,18 @@ class MoveCircleActionServer(Node):
         self.publisher_ = self.create_publisher(Twist, "cmd_vel", 10)
         self._goal_handle = None
         self._goal_lock = threading.Lock()
-        self.latest_pose = None
         self.kP = 0.5
+        self.latest_pose = 0
+        self.latest_pose_x = 0
+        self.latest_pose_y = 0
+        self.latest_orientation_x = 0
+        self.latest_orientation_y = 0
+        self.latest_orientation_z = 0
+        self.latest_orientation_w = 0
         self.callback_group = ReentrantCallbackGroup()
         self.odom_subscriber_ = self.create_subscription(
             Odometry,
-            "/odometry/filtered",
+            "/odometry/wheel",
             self.odom_callback,
             10,
             callback_group=self.callback_group,
