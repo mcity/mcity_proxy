@@ -152,7 +152,7 @@ class WaypointNavActionServer(Node):
         feedback_msg = WaypointNav.Feedback()
 
         tick = time.time()
-        last_error  = 0.0
+        last_error = 0.0
         integral = 0.0
         dt = time.time()
         while (
@@ -212,9 +212,9 @@ class WaypointNavActionServer(Node):
             - np.sin(lat1) * np.cos(lat2) * np.cos(long2 - long1),
         )
 
-        enu_bearing = (
-            -1 * bearing
-        ) + (np.pi / 2.0)  # *Return in ENU i.e. positive is counter-clockwise, 0 is east
+        enu_bearing = (-1 * bearing) + (
+            np.pi / 2.0
+        )  # *Return in ENU i.e. positive is counter-clockwise, 0 is east
 
         while enu_bearing > 2.0 * np.pi:
             enu_bearing -= 2.0 * np.pi
@@ -222,7 +222,6 @@ class WaypointNavActionServer(Node):
             enu_bearing += 2.0 * np.pi
 
         return enu_bearing
-
 
     def distance(self, p1, p2):
         """

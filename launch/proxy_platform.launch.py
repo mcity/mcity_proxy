@@ -112,14 +112,14 @@ def generate_launch_description():
             condition=IfCondition(ublox_toggle),
         )
     )
-    ld.add_action(
-        Node(
-            package="rmc_to_imu",
-            executable="rmc_to_imu",
-            name="rmc_to_imu",
-            condition=IfCondition(ublox_toggle),
-        )
-    )
+    # ld.add_action(
+    #     Node(
+    #         package="rmc_to_imu",
+    #         executable="rmc_to_imu",
+    #         name="rmc_to_imu",
+    #         condition=IfCondition(ublox_toggle),
+    #     )
+    # )
 
     ntrip_toggle = LaunchConfiguration("ntrip_toggle")
     ntrip_toggle_arg = DeclareLaunchArgument(
@@ -496,18 +496,18 @@ def generate_launch_description():
     )
     # Pull a laserscan from the ZED Camera
     ld.add_action(
-       Node(
-           package="depthimage_to_laserscan",
-           executable="depthimage_to_laserscan_node",
-           parameters=[
-               {"range_min": 1.5, "range_max": 35.0, "output_frame": "camera_link"}
-           ],
-           remappings=[
-               ("depth", "zed_2i/depth/image_raw"),
-               ("depth_camera_info", "zed_2i/depth/camera_info"),
-           ],
-           condition=IfCondition(zed_toggle),
-       )
+        Node(
+            package="depthimage_to_laserscan",
+            executable="depthimage_to_laserscan_node",
+            parameters=[
+                {"range_min": 1.5, "range_max": 35.0, "output_frame": "camera_link"}
+            ],
+            remappings=[
+                ("depth", "zed_2i/depth/image_raw"),
+                ("depth_camera_info", "zed_2i/depth/camera_info"),
+            ],
+            condition=IfCondition(zed_toggle),
+        )
     )
     ld.add_action(
         Node(
@@ -515,14 +515,12 @@ def generate_launch_description():
             executable="imu_filter_madgwick_node",
             name="imu_filter",
             output="screen",
-            parameters=[
-                os.path.join(pkg_share, "config/imu_filter.yaml")
-            ],
+            parameters=[os.path.join(pkg_share, "config/imu_filter.yaml")],
             remappings=[
                 ("imu/data_raw", "/zed2i/zed_node/imu/data_raw"),
                 ("imu/mag", "/zed2i/zed_node/imu/mag"),
-                ("imu/data", "imu/filter/data")
-            ]
+                ("imu/data", "imu/filter/data"),
+            ],
         )
     )
 
