@@ -96,3 +96,21 @@ Run `sudo crontab -e` and add the following line:
 ```
 @reboot /home/mcity/dev_ws/src/mcity_proxy/proxy_boot.sh
 ```
+
+## Magnetometer Calibration
+
+MAPP-02:
+
+```
+[INFO] [1684787286.957424315] [magnetometer_calibration]: Initial estimate for hard iron offsets: [5.
+91344e-07, -7.124e-07, -4.03757e-06]
+[INFO] [1684787287.544209454] [magnetometer_calibration]: Ceres Solver Report: Iterations: 22, Initia
+l cost: 7.961363e+01, Final cost: 1.340365e-10, Termination: CONVERGENCE
+[INFO] [1684787287.544424897] [magnetometer_calibration]: Estimated total magnetic field: 0.199024T
+[INFO] [1684787287.544554181] [magnetometer_calibration]: You can compare to expected values from
+[INFO] [1684787287.544652249] [magnetometer_calibration]:   https://www.ngdc.noaa.gov/geomag/calculat
+ors/magcalc.shtml#igrfwmm
+mag_bias_x: -0.114911
+mag_bias_y: 0.114903
+mag_bias_z: -0.114908
+```

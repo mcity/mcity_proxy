@@ -19,13 +19,14 @@ import os
 import time
 import math
 import copy
-from threading import Thread, Lock
+from threading import Thread, Lock, Event
 import socketio
 import json
 import time
 import re
 import numpy as np
 
+shutdown_event = Event()
 
 class SocketComms(socketio.ClientNamespace):
     proxy_control = None
@@ -495,6 +496,8 @@ def result_spin(sio, socket_comms, proxy_control):
                     proxy_control.get_result_callback
                 )
         time.sleep(0.1)
+        if shutdown_event.is_set():
+            break
 
 
 def status_updater(sio, socket_comms, proxy_control):
@@ -504,6 +507,8 @@ def status_updater(sio, socket_comms, proxy_control):
         except Exception as e:
             proxy_control.get_logger().debug(str(e))
         time.sleep(1.0)  # * Update status once per second
+        if shutdown_event.is_set():
+            break
 
 
 def main(args=None):
@@ -542,6 +547,7 @@ def main(args=None):
     # (optional - otherwise it will be done automatically
     # when the garbage collector destroys the node object)
     proxy_control.destroy_node()
+    shutdown_event.set()
     rclpy.shutdown()
 
 

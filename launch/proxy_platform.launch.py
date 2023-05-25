@@ -37,6 +37,17 @@ def generate_launch_description():
     )
     ld.add_action(mcity_proxy_toggle_arg)
     # Launch Proxy Functionality
+    proxy_params = os.path.join(
+        pkg_share, "params/proxy_params.yaml"
+    )
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
+            executable="proxy_params",
+            condition=IfCondition(mcity_proxy_toggle),
+            parameters=[proxy_params],
+        )
+    )
     ld.add_action(
         Node(
             package="mcity_proxy",
@@ -70,6 +81,13 @@ def generate_launch_description():
         Node(
             package="mcity_proxy",
             executable="proxy_control",
+            condition=IfCondition(mcity_proxy_toggle),
+        )
+    )
+    ld.add_action(
+        Node(
+            package="mcity_proxy",
+            executable="calibrate_heading_server",
             condition=IfCondition(mcity_proxy_toggle),
         )
     )
@@ -112,14 +130,14 @@ def generate_launch_description():
             condition=IfCondition(ublox_toggle),
         )
     )
-    # ld.add_action(
-    #     Node(
-    #         package="rmc_to_imu",
-    #         executable="rmc_to_imu",
-    #         name="rmc_to_imu",
-    #         condition=IfCondition(ublox_toggle),
-    #     )
-    # )
+    ld.add_action(
+        Node(
+            package="rmc_to_imu",
+            executable="rmc_to_imu",
+            name="rmc_to_imu",
+            condition=IfCondition(ublox_toggle),
+        )
+    )
 
     ntrip_toggle = LaunchConfiguration("ntrip_toggle")
     ntrip_toggle_arg = DeclareLaunchArgument(

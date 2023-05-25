@@ -16,7 +16,7 @@ setup(
         ("share/" + package_name + "/models", glob("models/*.urdf")),
         ("share/" + package_name + "/models", glob("models/*.urdf.xacro")),
         ("share/" + package_name + "/rviz", glob("rviz/*.rviz")),
-        # ("share/" + package_name + "/config", glob("config/*")),
+        ("share/" + package_name + "/config", glob("config/*")),
         ("share/" + package_name + "/worlds", glob("worlds/*.world")),
         ("share/" + package_name + "/params", glob("params/*.yaml")),
         ("share/" + package_name + "/maps", glob("maps/*")),
@@ -35,6 +35,8 @@ setup(
             "move_circle_action_server = mcity_proxy.move_circle_action_server:main",
             "waypoint_nav_action_server = mcity_proxy.waypoint_nav_action_server:main",
             "proxy_control = mcity_proxy.proxy_control:main",
+            "calibrate_heading_server = mcity_proxy.calibrate_heading_server:main",
+            "proxy_params = mcity_proxy.proxy_params:main",
         ],
     },
 )

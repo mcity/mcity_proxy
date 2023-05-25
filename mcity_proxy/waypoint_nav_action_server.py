@@ -12,8 +12,9 @@ from mcity_proxy_msgs.msg import Heading
 from rclpy.callback_groups import ReentrantCallbackGroup
 from tf_transformations import euler_from_quaternion
 from robot_localization.srv import FromLL, ToLL
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatFix, Imu
 from geographic_msgs.msg import GeoPoint
+from rcl_interfaces.srv import GetParameters
 
 import time
 import math
@@ -24,7 +25,7 @@ from threading import Thread
 COURSE_CORRECT_THRESHOLD = 0.01
 COURSE_CORRECTION_CUTOFF = 0.25
 ANGULAR_ERROR_ABORT = 2 * np.pi / 3
-GOAL_POSITION_TOLERANCE = 0.5
+GOAL_POSITION_TOLERANCE = 1.0
 KP = 0.5
 # KI = 0.004
 KI = 0.0
@@ -40,8 +41,16 @@ class WaypointNavActionServer(Node):
         self.goal_position = np.array([0.0, 0.0])
         self.latest_position = np.array([0.0, 0.0])
         self.latest_heading = 0.0
+        self.heading_correction = 0.12339477811 # Default to Estimated Magnetic Declination
         self.kP = 0.5
         self.callback_group = ReentrantCallbackGroup()
+        self.param_client = self.create_client(GetParameters,
+                                         '/proxy_params/get_parameters')
+        request = GetParameters.Request()
+        request.names = ['heading_correction']
+        self.param_client.wait_for_service()
+        future = self.param_client.call_async(request)
+        future.add_done_callback(self.callback_heading_correction)
 
         self._action_server = ActionServer(
             self,
@@ -55,13 +64,13 @@ class WaypointNavActionServer(Node):
         )
 
         # *Subscriptions and Publishers
-        self.heading_subscriber = self.create_subscription(
-            Heading,
-            "/heading",
-            self.heading_callback,
-            10,
-            callback_group=self.callback_group,
-        )
+        # self.heading_subscriber = self.create_subscription(
+        #     Heading,
+        #     "/heading",
+        #     self.heading_callback,
+        #     10,
+        #     callback_group=self.callback_group,
+        # )
         # self.odom_subscriber = self.create_subscription(
         #     Odometry,
         #     "/odometry/global",
@@ -76,22 +85,53 @@ class WaypointNavActionServer(Node):
             10,
             callback_group=self.callback_group,
         )
+        self.imu_subscriber = self.create_subscription(
+            Imu,
+            "/imu/filter/data",
+            self.imu_callback,
+            10,
+            callback_group=self.callback_group
+        )
+
 
     def destroy(self):
         self._action_server.destroy()
         super().destroy_node()
 
-    def heading_callback(self, msg):
-        self.latest_heading = float(msg.heading)
+    def callback_heading_correction(self, future):
+        try:
+            result = future.result()
+        except Exception as e:
+            self.get_logger().warn("Couldn't get Heading Correction parameter")
+        else:
+            self.get_logger().info(result.values[0])
+            self.heading_correction = result.values[0]
 
-    def odom_callback(self, msg):
+
+
+    # def heading_callback(self, msg):
+    #     self.latest_heading = float(msg.heading)
+
+    # def odom_callback(self, msg):
+    #     self.latest_heading = float(
+    #         euler_from_quaternion(
+    #             [
+    #                 msg.pose.pose.orientation.x,
+    #                 msg.pose.pose.orientation.y,
+    #                 msg.pose.pose.orientation.z,
+    #                 msg.pose.pose.orientation.w,
+    #             ]
+    #         )[2]
+    #     )
+
+    def imu_callback(self, msg):
         self.latest_heading = float(
             euler_from_quaternion(
                 [
-                    msg.pose.pose.orientation.x,
-                    msg.pose.pose.orientation.y,
-                    msg.pose.pose.orientation.z,
-                    msg.pose.pose.orientation.w,
+                    msg.orientation.x,
+                    msg.orientation.y,
+                    msg.orientation.z,
+                    msg.orientation.w,
                 ]
             )[2]
         )
@@ -126,6 +166,9 @@ class WaypointNavActionServer(Node):
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
                 return result
+            if self.latest_position[0] == 0.0 and self.latest_position[1] == 0.0:
+                self._goal_handle.abort()
+                return
             result = self.navigate_to_target(pt)
             if result is not None:
                 return result
@@ -155,10 +198,12 @@ class WaypointNavActionServer(Node):
         last_error = 0.0
         integral = 0.0
         dt = time.time()
+        curr_dist = self.distance(self.latest_position, self.goal_position)
+        # last_dist = 0.0
         while (
-            self.distance(self.latest_position, self.goal_position)
-            > GOAL_POSITION_TOLERANCE
-        ):  # *Loop until we've arrived
+            curr_dist
+            > GOAL_POSITION_TOLERANCE * waypoint.velocity #and curr_dist >= last_dist
+        ):  # *Loop until we've arrived or past our target
             # *Make sure we haven't been cancelled or aborted
             result = self.check_goal_state_change(self._goal_handle)
             if result is not None:
@@ -171,17 +216,18 @@ class WaypointNavActionServer(Node):
             )
 
             # *PID Controller
-            error = float(goal_bearing - self.latest_heading)
+            error = float(goal_bearing - self.latest_heading - self.heading_correction)
             while error > np.pi:
                 error -= 2.0 * np.pi
             while error < -1.0 * np.pi:
                 error += 2.0 * np.pi
-            dt = time.time() - dt
-            integral += error * dt
-            derivative = (error - last_error) / dt
-            theta = KP * error + KI * integral + KD * derivative
-            last_error = error
-            twist.angular.z = float(theta)
+            # dt = time.time() - dt
+            # integral += error * dt
+            # derivative = (error - last_error) / dt
+            # theta = KP * error + KI * integral + KD * derivative
+            # last_error = error
+            # twist.angular.z = float(theta)
+            twist.angular.z = float(error)
             self.publisher_.publish(twist)
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second
@@ -194,6 +240,8 @@ class WaypointNavActionServer(Node):
                 )
                 self._goal_handle.publish_feedback(feedback_msg)
                 tick = time.time()
+            # last_dist = curr_dist
+            curr_dist = self.distance(self.latest_position, self.goal_position)
         # * end while
 
         return None
