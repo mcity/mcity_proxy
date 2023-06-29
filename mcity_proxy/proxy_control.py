@@ -12,7 +12,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup, MutuallyExclusiveCallb
 from segway_msgs.srv import RosSetChassisEnableCmd
 from segway_msgs.msg import BmsFb
 from rclpy_message_converter import json_message_converter
-from sensor_msgs.msg import NavSatFix
+from sensor_msgs.msg import NavSatFix, LaserScan
 from geographic_msgs.msg import GeoPoint
 
 import os
@@ -295,6 +295,12 @@ class ProxyControl(Node):
         self.odometry_filtered_sub = self.create_subscription(
             Odometry, "/odometry/filtered", self.odometry_filtered_callback, 10
         )
+        self.laser_scan_sub = self.create_subscription(
+            LaserScan, "/scan", self.laser_scan_callback, 10
+        )
+        self.cmd_vel_sub = self.create_subscription(
+            Twist, "cmd_vel", self.cmd_vel_callback, 10
+        )
 
         # *Local Data Members
         self.reset()
@@ -302,6 +308,7 @@ class ProxyControl(Node):
         self.last_navsat_fix = NavSatFix()
         self.last_bms_fb = BmsFb()
         self.last_odom = Odometry()
+        self.latest_cmd_vel = Twist()
 
     def reset(self):
         self.is_running = False
@@ -351,6 +358,24 @@ class ProxyControl(Node):
             "geometry_msgs/Twist", values
         )
         self.cmd_vel_pub.publish(msg)
+
+    def cmd_vel_callback(self, msg):
+        """
+        Save latest cmd_vel Twist
+        """
+        self.latest_cmd_vel = msg
+
+    def laser_scan_callback(self, msg):
+        """
+        Check for obstacles and disable proxy if the proxy is in motion
+        """
+        proximity_count = 0
+        for laser_range in msg.ranges:
+            if laser_range < 1.0:
+                proximity_count += 1
+                if proximity_count > 10 and abs(self.latest_cmd_vel.linear.x) > 0.0:
+                    self.estop()
+
 
     def navsat_fix_callback(self, msg):
         """

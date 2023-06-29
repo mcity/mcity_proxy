@@ -104,8 +104,8 @@ class WaypointNavActionServer(Node):
         except Exception as e:
             self.get_logger().warn("Couldn't get Heading Correction parameter")
         else:
-            self.get_logger().info(result.values[0])
-            self.heading_correction = result.values[0]
+            self.get_logger().info("Heading correction: " + str(result.values[0].double_value))
+            self.heading_correction = float(result.values[0].double_value)
 
 
 

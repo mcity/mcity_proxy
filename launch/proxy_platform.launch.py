@@ -518,11 +518,11 @@ def generate_launch_description():
             package="depthimage_to_laserscan",
             executable="depthimage_to_laserscan_node",
             parameters=[
-                {"range_min": 1.5, "range_max": 35.0, "output_frame": "camera_link"}
+                {"range_max": 35.0, "output_frame": "camera_link"}
             ],
             remappings=[
-                ("depth", "zed_2i/depth/image_raw"),
-                ("depth_camera_info", "zed_2i/depth/camera_info"),
+                ("depth", "zed2i/zed_node/depth/depth_registered"),
+                ("depth_camera_info", "zed2i/zed_node/depth/camera_info"),
             ],
             condition=IfCondition(zed_toggle),
         )
