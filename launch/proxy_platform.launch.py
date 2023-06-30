@@ -20,6 +20,10 @@ from launch.substitutions import (
 from launch_ros.actions import Node, SetRemap
 from launch_ros.substitutions import FindPackageShare
 from ament_index_python.packages import get_package_share_directory
+from launch.launch_context import LaunchContext
+from launch.events.process.process_exited import ProcessExited
+from launch.actions import RegisterEventHandler
+from launch.event_handlers.on_process_exit import OnProcessExit
 
 
 def generate_launch_description():
@@ -121,14 +125,27 @@ def generate_launch_description():
         description="Determines whether or not to start the Ublox ROS wrapper.",
     )
     ld.add_action(ublox_toggle_arg)
+    ublox_config = os.path.join(
+        get_package_share_directory('ublox_gps'),
+        'config'
+    )
+    ublox_params = os.path.join(ublox_config, 'zed_f9r.yaml')
     # Launch Ublox ROS Wrapper
     ld.add_action(
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(
-                os.path.join(ublox_launch_dir, "ublox_gps_node-launch.py")
-            ),
-            condition=IfCondition(ublox_toggle),
-        )
+        # IncludeLaunchDescription(
+        #     PythonLaunchDescriptionSource(
+        #         os.path.join(ublox_launch_dir, "ublox_gps_node-launch.py")
+        #     ),
+        #     condition=IfCondition(ublox_toggle),
+        #     respawn=True,
+        # )
+        Node(
+                package='ublox_gps',
+                executable='ublox_gps_node',
+                output='both',
+                parameters=[os.path.join(ublox_config, 'zed_f9r.yaml')],
+                respawn=True,
+            )
     )
     ld.add_action(
         Node(
@@ -518,7 +535,7 @@ def generate_launch_description():
             package="depthimage_to_laserscan",
             executable="depthimage_to_laserscan_node",
             parameters=[
-                {"range_max": 35.0, "output_frame": "camera_link"}
+                {"scan_height": 1, "range_max": 35.0, "output_frame": "camera_link"}
             ],
             remappings=[
                 ("depth", "zed2i/zed_node/depth/depth_registered"),

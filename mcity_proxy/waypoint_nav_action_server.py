@@ -46,11 +46,6 @@ class WaypointNavActionServer(Node):
         self.callback_group = ReentrantCallbackGroup()
         self.param_client = self.create_client(GetParameters,
                                          '/proxy_params/get_parameters')
-        request = GetParameters.Request()
-        request.names = ['heading_correction']
-        self.param_client.wait_for_service()
-        future = self.param_client.call_async(request)
-        future.add_done_callback(self.callback_heading_correction)
 
         self._action_server = ActionServer(
             self,
@@ -92,20 +87,28 @@ class WaypointNavActionServer(Node):
             10,
             callback_group=self.callback_group
         )
+        self.get_heading_correction()
 
 
     def destroy(self):
         self._action_server.destroy()
         super().destroy_node()
 
+    def get_heading_correction(self):
+        request = GetParameters.Request()
+        request.names = ['heading_correction']
+        self.param_client.wait_for_service()
+        future = self.param_client.call_async(request)
+        future.add_done_callback(self.callback_heading_correction)
+
     def callback_heading_correction(self, future):
         try:
-            result = future.result()
+            heading_result = future.result()
         except Exception as e:
             self.get_logger().warn("Couldn't get Heading Correction parameter")
         else:
-            self.get_logger().info("Heading correction: " + str(result.values[0].double_value))
-            self.heading_correction = float(result.values[0].double_value)
+            self.get_logger().info("Heading correction: " + str(heading_result.values[0].double_value))
+            self.heading_correction = float(heading_result.values[0].double_value)
 
 
 
@@ -140,6 +143,7 @@ class WaypointNavActionServer(Node):
         self.latest_position = np.array([msg.latitude, msg.longitude])
 
     def goal_callback(self, goal_request):
+        self.get_heading_correction()
         self.get_logger().info("WaypointNav Action Server: Received Goal")
         return GoalResponse.ACCEPT
 
@@ -163,13 +167,17 @@ class WaypointNavActionServer(Node):
 
         for pt in waypoints:
             # * Make sure we haven't been cancelled or aborted
+            self.get_logger().info("1")
             result = self.check_goal_state_change(self._goal_handle)
+            self.get_logger().info("2")
             if result is not None:
                 return result
             if self.latest_position[0] == 0.0 and self.latest_position[1] == 0.0:
                 self._goal_handle.abort()
                 return
+            self.get_logger().info("3")
             result = self.navigate_to_target(pt)
+            self.get_logger().info("4")
             if result is not None:
                 return result
 
@@ -231,13 +239,13 @@ class WaypointNavActionServer(Node):
             self.publisher_.publish(twist)
 
             if time.time() - tick > 1.0:  # * Send feedback every 1 second
-                self.get_logger().info("Feedback")
                 feedback_msg.current_position = GeoPoint(
                     latitude=self.latest_position[0], longitude=self.latest_position[1]
                 )
                 feedback_msg.distance_to_goal = self.distance(
                     self.latest_position, self.goal_position
                 )
+                self.get_logger().info(str(feedback_msg.distance_to_goal))
                 self._goal_handle.publish_feedback(feedback_msg)
                 tick = time.time()
             # last_dist = curr_dist

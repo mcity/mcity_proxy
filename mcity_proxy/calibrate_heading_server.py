@@ -14,7 +14,9 @@ from tf_transformations import euler_from_quaternion
 from robot_localization.srv import FromLL, ToLL
 from sensor_msgs.msg import NavSatFix, Imu
 from geographic_msgs.msg import GeoPoint
-from rcl_interfaces.srv import GetParameters
+from rcl_interfaces.srv import GetParameters, SetParameters
+from rclpy.parameter import Parameter
+from rcl_interfaces.msg import ParameterValue, ParameterType
 from mcity_proxy_msgs.srv import CalibrateHeading
 
 import time
@@ -29,7 +31,6 @@ class CalibrateHeadingServer(Node):
         self.callback_group = ReentrantCallbackGroup()
         self.srv = self.create_service(CalibrateHeading, 'calibrate_heading', self.calibrate_heading_callback)
         self.cmd_vel_pub = self.create_publisher(Twist, "cmd_vel", 10)
-        self.reset()
         self.latest_gps_heading = 0.0
         self.latest_imu_heading = 0.0
         self.latest_position = np.array([0.0, 0.0])
@@ -56,9 +57,7 @@ class CalibrateHeadingServer(Node):
             callback_group=self.callback_group,
         )
 
-    def reset(self):
-        self.confirmation = False
-        self.finished = False
+        self.set_params = self.create_client(SetParameters, '/proxy_params/set_parameters')
 
     def heading_callback(self, msg):
         self.latest_gps_heading = float(msg.heading)
@@ -104,12 +103,6 @@ class CalibrateHeadingServer(Node):
         return enu_bearing
 
     def calibrate_heading_callback(self, request, response):
-        if not self.confirmation:
-            self.get_logger().warn("THE PROXY WILL MOVE FORWARD 5 METERS DURING CALIBRATION. CALL SERVICE AGAIN TO CONFIRM PATH IS CLEAR.")
-            self.confirmation = True
-            response.success = False
-            return response
-
         target_heading = self.latest_imu_heading
         starting_position = self.latest_position
 
@@ -126,6 +119,10 @@ class CalibrateHeadingServer(Node):
         time.sleep(1.0)
         correction_factor = self.calc_bearing(starting_position, self.latest_position) - self.latest_imu_heading
         self.get_logger().info(f"Correction Factor: {correction_factor}")
+        request = SetParameters.Request()
+        # value = ParameterValue(type=ParameterType.PARAMETER_DOUBLE, double_value=float(correction_factor))
+        request.parameters = [Parameter(name='heading_correction', value=float(correction_factor)).to_parameter_msg()]
+        self.set_params.call_async(request)
         response.success = True
         msg.linear.x = -0.5
 
@@ -136,7 +133,6 @@ class CalibrateHeadingServer(Node):
         msg.linear.x = 0.0
         msg.angular.z = 0.0
         self.cmd_vel_pub.publish(msg)
-        self.reset()
         return response
 
 

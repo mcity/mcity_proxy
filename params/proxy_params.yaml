@@ -1,3 +1,3 @@
 proxy_params:
   ros__parameters:
-    heading_correction: 0.10847772156318536
+    heading_correction: -0.40647311866762936

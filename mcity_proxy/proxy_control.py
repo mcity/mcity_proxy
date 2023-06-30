@@ -367,13 +367,14 @@ class ProxyControl(Node):
 
     def laser_scan_callback(self, msg):
         """
-        Check for obstacles and disable proxy if the proxy is in motion
+        Check for obstacles and estop if the proxy is in motion
         """
         proximity_count = 0
         for laser_range in msg.ranges:
-            if laser_range < 1.0:
+            if laser_range < max(self.latest_cmd_vel.linear.x, 0.5):
                 proximity_count += 1
-                if proximity_count > 10 and abs(self.latest_cmd_vel.linear.x) > 0.0:
+                if proximity_count > 10 and self.latest_cmd_vel.linear.x > 0.0:
+                    self.get_logger().error("Detected Obstacle, E-Stop engaged!")
                     self.estop()
 
 

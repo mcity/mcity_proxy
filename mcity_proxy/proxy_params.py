@@ -14,6 +14,7 @@ from tf_transformations import euler_from_quaternion
 from robot_localization.srv import FromLL, ToLL
 from sensor_msgs.msg import NavSatFix, Imu
 from geographic_msgs.msg import GeoPoint
+from rcl_interfaces.msg import ParameterType
 
 import time
 import math
@@ -24,6 +25,7 @@ from threading import Thread
 class ProxyParams(Node):
     def __init__(self):
         super().__init__("proxy_params", allow_undeclared_parameters=True, automatically_declare_parameters_from_overrides=True)
+        # self.declare_parameter('heading_correction', ParameterType.PARAMETER_DOUBLE)
 
 def main(args=None):
     rclpy.init(args=args)
